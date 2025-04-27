@@ -1,3 +1,4 @@
+
 'use server'; // Required for server-side actions
 
 import { db, storage } from '@/lib/firebase';
@@ -21,6 +22,7 @@ export type UpdateProductData = Partial<Omit<Product, 'id' | 'imageUrl'>> & {
 
 /**
  * Fetches all products from the Firestore 'products' collection.
+ * Returns only serializable fields suitable for client components.
  * @returns Promise<Product[]> An array of products.
  */
 export async function getProducts(): Promise<Product[]> {
@@ -28,10 +30,22 @@ export async function getProducts(): Promise<Product[]> {
         console.log("Attempting to fetch products from Firestore...");
         const productsCollection = collection(db, 'products');
         const productSnapshot = await getDocs(productsCollection);
-        const productList = productSnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-        })) as Product[];
+
+        // Map documents to Product type, explicitly excluding non-serializable fields like Timestamps
+        const productList = productSnapshot.docs.map(doc => {
+             const data = doc.data();
+             // Ensure only fields defined in the Product type are included
+             return {
+                id: doc.id,
+                name: data.name,
+                type: data.type,
+                description: data.description,
+                price: data.price,
+                imageUrl: data.imageUrl || DEFAULT_IMAGE_URL, // Use default if imageUrl is missing
+                quantity: data.quantity,
+            } as Product; // Assert the final shape matches the Product type
+        });
+
         console.log(`Successfully fetched ${productList.length} products.`);
         return productList;
     } catch (error) {
@@ -44,7 +58,9 @@ export async function getProducts(): Promise<Product[]> {
                  throw new Error("Permission denied when fetching products. Check Firestore security rules.");
              } else if (error.code === 'unauthenticated') {
                  throw new Error("User is unauthenticated. Cannot fetch products.");
-            }
+             } else if (error.code === 'unavailable') {
+                throw new Error("Firestore is currently unavailable. Please try again later.");
+             }
             throw new Error(`Failed to fetch products due to Firestore error: ${error.message}`);
         }
         // Fallback for generic errors
@@ -108,7 +124,7 @@ export async function addProduct(productData: AddProductData): Promise<string> {
         const docRef = await addDoc(productsCollection, {
             ...dataToSave,
             imageUrl: imageUrl, // Add the final image URL
-            createdAt: serverTimestamp(), // Optional: Add a timestamp
+            createdAt: serverTimestamp(), // Add a timestamp for server-side sorting/tracking if needed
         });
         console.log("Product added with ID: ", docRef.id);
         return docRef.id;
@@ -120,7 +136,7 @@ export async function addProduct(productData: AddProductData): Promise<string> {
                  throw new Error("Permission denied when adding product. Check Firestore security rules.");
              } else if (error.code === 'unauthenticated') {
                  throw new Error("User is unauthenticated. Cannot add product.");
-            }
+             }
             throw new Error(`Failed to add product due to Firestore error: ${error.message}`);
         }
         // Fallback for generic errors
@@ -158,8 +174,9 @@ export async function updateProduct(productId: string, productData: UpdateProduc
 
      // Remove fields with undefined values, as Firestore doesn't allow them directly in updates
      Object.keys(dataToUpdate).forEach(key => {
-         if (dataToUpdate[key as keyof typeof dataToUpdate] === undefined) {
-             delete dataToUpdate[key as keyof typeof dataToUpdate];
+         const typedKey = key as keyof typeof dataToUpdate;
+         if (dataToUpdate[typedKey] === undefined) {
+             delete dataToUpdate[typedKey];
          }
      });
 
@@ -174,7 +191,7 @@ export async function updateProduct(productId: string, productData: UpdateProduc
         const productDoc = doc(db, 'products', productId);
         await updateDoc(productDoc, {
              ...dataToUpdate,
-             updatedAt: serverTimestamp(), // Optional: Add an update timestamp
+             updatedAt: serverTimestamp(), // Add an update timestamp
         });
         console.log("Product updated with ID: ", productId);
     } catch (error) {
@@ -185,7 +202,7 @@ export async function updateProduct(productId: string, productData: UpdateProduc
                  throw new Error("Permission denied when updating product. Check Firestore security rules.");
              } else if (error.code === 'unauthenticated') {
                  throw new Error("User is unauthenticated. Cannot update product.");
-            }
+             }
             throw new Error(`Failed to update product due to Firestore error: ${error.message}`);
         }
         // Fallback for generic errors
