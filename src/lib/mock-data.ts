@@ -1,0 +1,68 @@
+import type { Product } from '@/types/product';
+
+export const mockProducts: Product[] = [
+  {
+    id: 'prod_1',
+    name: 'Velvet Luxe Lipstick',
+    type: 'Beauty',
+    description: 'A rich, long-lasting lipstick with a smooth velvet finish. Available in 12 shades.',
+    price: 24.99,
+    imageUrl: 'https://picsum.photos/seed/lipstick/400/300',
+  },
+  {
+    id: 'prod_2',
+    name: 'Silk Blend Blouse',
+    type: 'Clothing',
+    description: 'Elegant V-neck blouse made from a luxurious silk blend. Perfect for work or evening wear.',
+    price: 79.50,
+    imageUrl: 'https://picsum.photos/seed/blouse/400/300',
+  },
+  {
+    id: 'prod_3',
+    name: 'Hydrating Face Serum',
+    type: 'Beauty',
+    description: 'Lightweight serum packed with hyaluronic acid to deeply hydrate and plump the skin.',
+    price: 45.00,
+    imageUrl: 'https://picsum.photos/seed/serum/400/300',
+  },
+  {
+    id: 'prod_4',
+    name: 'Cashmere Wrap Scarf',
+    type: 'Clothing',
+    description: 'Ultra-soft 100% cashmere scarf, generously sized for versatile styling.',
+    price: 120.00,
+    imageUrl: 'https://picsum.photos/seed/scarf/400/300',
+  },
+  {
+    id: 'prod_5',
+    name: 'Radiance Enhancing Primer',
+    type: 'Beauty',
+    description: 'Creates a smooth, radiant canvas for makeup application, extending wear time.',
+    price: 32.00,
+    imageUrl: 'https://picsum.photos/seed/primer/400/300',
+  },
+  {
+    id: 'prod_6',
+    name: 'Tailored Linen Trousers',
+    type: 'Clothing',
+    description: 'Breathable linen trousers with a flattering wide-leg cut and tailored fit.',
+    price: 89.99,
+    imageUrl: 'https://picsum.photos/seed/trousers/400/300',
+  },
+   {
+    id: 'prod_7',
+    name: 'Volumizing Mascara',
+    type: 'Beauty',
+    description: 'Lift, curl, and volumize lashes for a dramatic, wide-eyed look. Smudge-proof formula.',
+    price: 21.50,
+    imageUrl: 'https://picsum.photos/seed/mascara/400/300',
+  },
+  {
+    id: 'prod_8',
+    name: 'Organic Cotton T-Shirt',
+    type: 'Clothing',
+    description: 'Classic crew neck t-shirt made from soft, GOTS-certified organic cotton.',
+    price: 35.00,
+    imageUrl: 'https://picsum.photos/seed/tshirt/400/300',
+  },
+];
