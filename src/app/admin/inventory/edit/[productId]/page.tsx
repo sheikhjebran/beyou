@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -13,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from "@/hooks/use-toast";
-import { updateProduct, getProducts, type UpdateProductData } from '@/services/productService'; // Import updateProduct and getProducts
+import { updateProduct, getProductById, type UpdateProductData } from '@/services/productService'; // Use getProductById
 import { Loader2, ArrowLeft, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -64,7 +65,7 @@ export default function EditProductPage() {
     },
   });
 
-  // Fetch existing product data
+  // Fetch existing product data using getProductById
   useEffect(() => {
      if (!productId) {
          setError("Product ID not found in URL.");
@@ -76,10 +77,7 @@ export default function EditProductPage() {
       setIsLoadingProduct(true);
       setError(null);
       try {
-         // Inefficient: Fetch all products just to find one.
-         // TODO: Implement getProductById(productId) in productService for efficiency
-         const allProducts = await getProducts();
-         const currentProduct = allProducts.find(p => p.id === productId);
+         const currentProduct = await getProductById(productId); // Use the efficient function
 
          if (currentProduct) {
            setProductData(currentProduct);

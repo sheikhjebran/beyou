@@ -2,7 +2,7 @@
 'use server'; // Required for server-side actions
 
 import { db, storage } from '@/lib/firebase';
-import { collection, getDocs, addDoc, doc, updateDoc, serverTimestamp, FirestoreError, query, orderBy, limit, Timestamp } from 'firebase/firestore'; // Import FirestoreError, query, orderBy, limit, Timestamp
+import { collection, getDocs, addDoc, doc, updateDoc, serverTimestamp, FirestoreError, query, orderBy, limit, Timestamp, getDoc } from 'firebase/firestore'; // Import FirestoreError, query, orderBy, limit, Timestamp, getDoc
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { Product } from '@/types/product';
 
@@ -40,7 +40,7 @@ const serializeTimestamp = (timestamp: unknown): string | null => {
 /**
  * Fetches all products from the Firestore 'products' collection.
  * Returns only serializable fields suitable for client components.
- * Products are sorted by name by default in Firestore unless otherwise specified.
+ * Products are sorted by name by default.
  * @returns Promise<Product[]> An array of products.
  */
 export async function getProducts(): Promise<Product[]> {
@@ -55,7 +55,7 @@ export async function getProducts(): Promise<Product[]> {
         const productList = productSnapshot.docs.map(doc => {
              const data = doc.data();
              // Ensure only fields defined in the Product type are included
-             return {
+             const product: Product = {
                 id: doc.id,
                 name: data.name,
                 type: data.type,
@@ -66,7 +66,8 @@ export async function getProducts(): Promise<Product[]> {
                 // Timestamps are NOT included here to avoid serialization issues for client components
                 // createdAt: serializeTimestamp(data.createdAt),
                 // updatedAt: serializeTimestamp(data.updatedAt),
-            } as Product; // Assert the final shape matches the Product type
+            };
+            return product;
         });
 
         console.log(`Successfully fetched ${productList.length} products.`);
@@ -85,7 +86,7 @@ export async function getProducts(): Promise<Product[]> {
                 throw new Error("Firestore is currently unavailable. Please try again later.");
              } else if (error.code === 'failed-precondition' && error.message.includes('index')) {
                  // Suggest creating the index
-                 console.error("Firestore index required. Please create the necessary composite index in your Firebase console.");
+                 console.error("Firestore index required for sorting by name. Please create the necessary index on the 'products' collection for the 'name' field (ascending) in your Firebase console.");
                  throw new Error("Database index required for sorting/filtering. Please check server logs or Firebase console to create the required index.");
              }
             throw new Error(`Failed to fetch products due to Firestore error: ${error.message}`);
@@ -160,6 +161,7 @@ export async function getMostRecentProduct(): Promise<Product | null> {
                  // Provide clearer guidance to create the index
                  const indexCreationMessage = "Firestore index required for fetching the most recent product. Please create the composite index on the 'products' collection with fields 'updatedAt' (descending) and 'createdAt' (descending) in your Firebase console. The specific index needed might be provided in the Firebase console error log or link.";
                  console.error(indexCreationMessage);
+                 console.error("You might be able to create it using this link (requires Firebase Console access):", error.message.substring(error.message.indexOf('https://')));
                  // Optionally, throw a user-friendly error or return null for dashboard
                  // throw new Error("Database configuration needed. Please check server logs or contact support.");
                  return null; // Return null to allow the rest of the dashboard to load
@@ -172,6 +174,53 @@ export async function getMostRecentProduct(): Promise<Product | null> {
         console.error(`Failed to fetch recent product. Original error: ${error instanceof Error ? error.message : String(error)}`);
         return null;
     }
+}
+
+/**
+ * Fetches a single product by its ID from Firestore.
+ * Returns only serializable fields suitable for client components.
+ * @param productId The ID of the product to fetch.
+ * @returns Promise<Product | null> The product or null if not found.
+ */
+export async function getProductById(productId: string): Promise<Product | null> {
+  try {
+    console.log(`Attempting to fetch product with ID: ${productId}...`);
+    const productDocRef = doc(db, 'products', productId);
+    const productDoc = await getDoc(productDocRef);
+
+    if (!productDoc.exists()) {
+      console.log(`Product with ID ${productId} not found.`);
+      return null;
+    }
+
+    const data = productDoc.data();
+    const product: Product = {
+      id: productDoc.id,
+      name: data.name,
+      type: data.type,
+      description: data.description,
+      price: data.price,
+      imageUrl: data.imageUrl || DEFAULT_IMAGE_URL,
+      quantity: data.quantity,
+      // Timestamps are NOT included here
+    };
+
+    console.log(`Successfully fetched product: ${productId}`);
+    return product;
+  } catch (error) {
+    console.error(`Error fetching product with ID ${productId}: `, error);
+    if (error instanceof FirestoreError) {
+      console.error(`Firestore Error Code: ${error.code}`);
+      if (error.code === 'permission-denied') {
+        throw new Error(`Permission denied when fetching product ${productId}. Check Firestore security rules.`);
+      } else if (error.code === 'unauthenticated') {
+        throw new Error(`User is unauthenticated. Cannot fetch product ${productId}.`);
+      }
+      throw new Error(`Failed to fetch product ${productId} due to Firestore error: ${error.message}`);
+    }
+    // Fallback for generic errors
+    throw new Error(`Failed to fetch product ${productId}. Original error: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 
@@ -334,4 +383,5 @@ export async function updateProduct(productId: string, productData: UpdateProduc
 //         throw new Error("Failed to delete product.");
 //     }
 // }
+
 
