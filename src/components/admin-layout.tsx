@@ -1,8 +1,9 @@
+
 'use client';
 
 import * as React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation'; // Import useRouter
 import {
   SidebarProvider,
   Sidebar,
@@ -22,9 +23,17 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 export function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter(); // Get router instance
 
   // Basic check for active route (can be refined)
   const isActive = (path: string) => pathname === path;
+
+  const handleLogout = () => {
+    // Simple logout: redirect to home page.
+    // In a real app, this would involve clearing session/token.
+    router.push('/');
+  };
+
 
   return (
     <SidebarProvider defaultOpen>
@@ -80,11 +89,11 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                  </Link>
              </SidebarMenuItem>
              <SidebarMenuItem>
-                {/* Placeholder for logout - implement actual logout logic here */}
+                {/* Implement actual logout logic here */}
                 <SidebarMenuButton
                    tooltip={{ children: "Logout", side: "right" }}
                    aria-label="Logout"
-                   onClick={() => console.log('Logout clicked')} // Replace with actual logout
+                   onClick={handleLogout} // Use handleLogout function
                    className="text-destructive hover:bg-destructive/10"
                  >
                    <LogOut />
