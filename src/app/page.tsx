@@ -1,21 +1,32 @@
 
+"use client"; // Add this directive for state management
+
+import { useState } from 'react';
 import { ProductGrid } from '@/components/product-grid';
 import { mockProducts } from '@/lib/mock-data';
 import { Header } from '@/components/header';
 import Image from 'next/image';
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
+import type { Product } from '@/types/product'; // Import Product type
 
 export default function Home() {
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Filter products based on search term
+  const filteredProducts = mockProducts.filter((product: Product) =>
+    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    product.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <div className="flex min-h-screen flex-col">
-      <Header />
+      {/* Pass setSearchTerm to Header */}
+      <Header onSearchChange={setSearchTerm} />
       <main className="flex-1 container mx-auto">
         {/* Banner Section */}
         <section className="relative w-full h-[400px] md:h-[500px] rounded-lg overflow-hidden my-8 shadow-lg">
           <Image
             src="https://picsum.photos/seed/herobanner/1200/500" // Placeholder banner image
-            alt="Elegance Boutique Banner"
+            alt="BeYou Banner"
             layout="fill"
             objectFit="cover"
             priority // Load banner image faster
@@ -40,7 +51,14 @@ export default function Home() {
         {/* Product Grid Section */}
         <section id="products" className="p-6">
            <h2 className="mb-8 text-3xl font-bold tracking-tight text-center">Our Products</h2>
-           <ProductGrid products={mockProducts} />
+           {/* Pass filtered products to ProductGrid */}
+           <ProductGrid products={filteredProducts} />
+            {/* Show message if no products match search */}
+           {filteredProducts.length === 0 && searchTerm && (
+             <p className="text-center text-muted-foreground mt-8">
+                No products found matching "{searchTerm}".
+             </p>
+            )}
         </section>
 
       </main>

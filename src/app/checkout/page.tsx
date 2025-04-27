@@ -47,6 +47,7 @@ export default function CheckoutPage() {
 
   return (
      <div className="flex min-h-screen flex-col">
+       {/* Header without search functionality */}
        <Header />
        <main className="flex-1 p-6 container mx-auto">
         <h1 className="text-3xl font-bold mb-8 text-center">Your Cart</h1>
