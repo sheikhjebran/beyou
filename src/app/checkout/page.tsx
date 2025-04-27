@@ -28,9 +28,11 @@ export default function CheckoutPage() {
   const generateWhatsAppMessage = () => {
     let message = "Hi BeYou! I'd like to purchase the following items:\n\n";
     items.forEach(item => {
-      message += `* ${item.product.name} (x${item.quantity}) - $${(item.product.price * item.quantity).toFixed(2)}\n`;
+      // Updated currency symbol to INR
+      message += `* ${item.product.name} (x${item.quantity}) - ₹${(item.product.price * item.quantity).toFixed(2)}\n`;
     });
-    message += `\n*Total: $${totalPrice.toFixed(2)}*`;
+    // Updated currency symbol to INR
+    message += `\n*Total: ₹${totalPrice.toFixed(2)}*`;
     return encodeURIComponent(message);
   };
 
@@ -69,8 +71,8 @@ export default function CheckoutPage() {
                     <TableHead className="w-[100px]">Product</TableHead>
                     <TableHead>Details</TableHead>
                     <TableHead className="text-center">Quantity</TableHead>
-                    <TableHead className="text-right">Price</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-right">Price (₹)</TableHead> {/* Updated Header */}
+                    <TableHead className="text-right">Total (₹)</TableHead> {/* Updated Header */}
                     <TableHead className="w-[50px]"></TableHead> {/* Remove action */}
                   </TableRow>
                 </TableHeader>
@@ -111,8 +113,10 @@ export default function CheckoutPage() {
                            </Button>
                          </div>
                       </TableCell>
-                       <TableCell className="text-right">${item.product.price.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">${(item.product.price * item.quantity).toFixed(2)}</TableCell>
+                       {/* Updated currency symbol and ensured black text via text-foreground */}
+                       <TableCell className="text-right text-foreground">₹{item.product.price.toFixed(2)}</TableCell>
+                       {/* Updated currency symbol and ensured black text via text-foreground */}
+                      <TableCell className="text-right text-foreground">₹{(item.product.price * item.quantity).toFixed(2)}</TableCell>
                        <TableCell className="text-right">
                          <Button
                            variant="ghost"
@@ -128,8 +132,9 @@ export default function CheckoutPage() {
                 </TableBody>
                  <TableFooter>
                     <TableRow>
-                      <TableCell colSpan={4} className="text-right font-bold text-lg">Total</TableCell>
-                      <TableCell className="text-right font-bold text-lg">${totalPrice.toFixed(2)}</TableCell>
+                      <TableCell colSpan={4} className="text-right font-bold text-lg text-foreground">Total</TableCell>
+                      {/* Updated currency symbol and ensured black text via text-foreground */}
+                      <TableCell className="text-right font-bold text-lg text-foreground">₹{totalPrice.toFixed(2)}</TableCell>
                       <TableCell></TableCell> {/* Empty cell for alignment */}
                     </TableRow>
                   </TableFooter>

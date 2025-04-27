@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { Product } from '@/types/product';
@@ -49,8 +50,9 @@ export function ProductCard({ product }: ProductCardProps) {
         <CardDescription className="mb-4 text-sm text-muted-foreground line-clamp-2">
           {product.description}
         </CardDescription>
-        <div className="text-lg font-bold text-primary">
-          ${product.price.toFixed(2)}
+        {/* Ensure price uses foreground color for black text */}
+        <div className="text-lg font-bold text-foreground">
+          ₹{product.price.toFixed(2)}
         </div>
       </CardContent>
       <CardFooter className="p-4 pt-0">
