@@ -4,11 +4,26 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input'; // Import Input
-import { LogIn, ShoppingCart, Search, Menu } from 'lucide-react'; // Import Search icon, added Menu
+import { LogIn, ShoppingCart, Search, Menu, ChevronDown } from 'lucide-react'; // Import Search icon, added Menu, ChevronDown
 import { useCart } from '@/hooks/use-cart'; // Import the useCart hook
 import { Badge } from '@/components/ui/badge'; // Import Badge
 import { useState, useEffect } from 'react'; // Import useState and useEffect
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet"; // Import Sheet components
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuPortal,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"; // Import Dropdown components
+
 
 // Define props for the Header component
 interface HeaderProps {
@@ -36,13 +51,21 @@ export function Header({ onSearchChange }: HeaderProps) {
     }
   };
 
-  // Navigation Links Array
-  const navLinks = [
+  // Base Navigation Links Array (excluding categories dropdown)
+  const baseNavLinks = [
     { href: "/", label: "Home" },
     { href: "/#products", label: "All Products" },
-    { href: "/", label: "Category" }, // Added Category link (pointing to home for now)
+    // Category dropdown will be handled separately
     { href: "/contact", label: "Contact Us" },
   ];
+
+  // Mobile Navigation Links (includes a simple Categories link for now)
+   const mobileNavLinks = [
+     ...baseNavLinks.slice(0, 2), // Home, All Products
+     { href: "/", label: "Categories" }, // Simple link for mobile
+     ...baseNavLinks.slice(2) // Contact Us
+   ];
+
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -58,7 +81,8 @@ export function Header({ onSearchChange }: HeaderProps) {
              </SheetTrigger>
              <SheetContent side="left" className="w-full max-w-xs sm:max-w-sm">
                <nav className="flex flex-col space-y-4 p-4">
-                 {navLinks.map((link) => (
+                 {/* Use mobile specific links */}
+                 {mobileNavLinks.map((link) => (
                     <SheetClose asChild key={link.href + link.label + '-mobile'}>
                        <Link
                          href={link.href}
@@ -79,6 +103,7 @@ export function Header({ onSearchChange }: HeaderProps) {
                          value={localSearchTerm}
                          onChange={handleSearchInputChange}
                          aria-label="Search products"
+                         suppressHydrationWarning // Added to help with potential hydration issues
                        />
                      </div>
                   )}
@@ -95,15 +120,104 @@ export function Header({ onSearchChange }: HeaderProps) {
 
         {/* Main Navigation (Desktop) */}
         <nav className="hidden md:flex items-center space-x-6 text-sm font-medium flex-1 justify-center">
-           {navLinks.map((link) => (
-              <Link
-                key={link.href + link.label + '-desktop'}
-                href={link.href}
-                className="text-foreground transition-colors hover:text-primary"
-              >
-                {link.label}
-              </Link>
-            ))}
+           {/* Render base links directly */}
+           <Link
+              key={baseNavLinks[0].href + baseNavLinks[0].label + '-desktop'}
+              href={baseNavLinks[0].href}
+              className="text-foreground transition-colors hover:text-primary"
+            >
+              {baseNavLinks[0].label}
+           </Link>
+            <Link
+              key={baseNavLinks[1].href + baseNavLinks[1].label + '-desktop'}
+              href={baseNavLinks[1].href}
+              className="text-foreground transition-colors hover:text-primary"
+            >
+              {baseNavLinks[1].label}
+            </Link>
+
+           {/* Categories Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="text-sm font-medium text-foreground transition-colors hover:text-primary px-0">
+                  Categories <ChevronDown className="relative top-[1px] ml-1 h-3 w-3 transition duration-200 group-data-[state=open]:rotate-180" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56">
+                 <DropdownMenuSub>
+                   <DropdownMenuSubTrigger>
+                     <span>K-Beauty</span>
+                   </DropdownMenuSubTrigger>
+                   <DropdownMenuPortal>
+                     <DropdownMenuSubContent>
+                       <DropdownMenuItem><Link href="/">Lip Gloss</Link></DropdownMenuItem>
+                       <DropdownMenuItem><Link href="/">Matte Lipstick</Link></DropdownMenuItem>
+                       <DropdownMenuItem><Link href="/">Liquid Matte Lipstick</Link></DropdownMenuItem>
+                       <DropdownMenuItem><Link href="/">Lip and Cheek Tint</Link></DropdownMenuItem>
+                       <DropdownMenuItem><Link href="/">Water Tint</Link></DropdownMenuItem>
+                       <DropdownMenuItem><Link href="/">Highlighters</Link></DropdownMenuItem>
+                       <DropdownMenuItem><Link href="/">Liquid Blush</Link></DropdownMenuItem>
+                       <DropdownMenuItem><Link href="/">Powder Blush</Link></DropdownMenuItem>
+                     </DropdownMenuSubContent>
+                   </DropdownMenuPortal>
+                 </DropdownMenuSub>
+
+                 <DropdownMenuSub>
+                   <DropdownMenuSubTrigger>
+                     <span>Nails</span>
+                   </DropdownMenuSubTrigger>
+                   <DropdownMenuPortal>
+                     <DropdownMenuSubContent>
+                       <DropdownMenuItem><Link href="/">Press-On Nails</Link></DropdownMenuItem>
+                       <DropdownMenuItem><Link href="/">Nail glue</Link></DropdownMenuItem>
+                       <DropdownMenuItem><Link href="/">Nail filers</Link></DropdownMenuItem>
+                     </DropdownMenuSubContent>
+                   </DropdownMenuPortal>
+                 </DropdownMenuSub>
+
+                 <DropdownMenuSub>
+                   <DropdownMenuSubTrigger>
+                      <span>Brands</span>
+                   </DropdownMenuSubTrigger>
+                    <DropdownMenuPortal>
+                      <DropdownMenuSubContent>
+                        {/* <DropdownMenuItem><Link href="/">Be You by Ayesha Banu</Link></DropdownMenuItem> */}
+                        <DropdownMenuLabel className="font-normal text-muted-foreground text-xs">Top Picks</DropdownMenuLabel>
+                         <DropdownMenuItem><Link href="/">Gloss</Link></DropdownMenuItem>
+                         <DropdownMenuItem><Link href="/">Lipstick</Link></DropdownMenuItem>
+                         <DropdownMenuItem><Link href="/">Blush</Link></DropdownMenuItem>
+                         <DropdownMenuItem><Link href="/">Highlighter</Link></DropdownMenuItem>
+                         <DropdownMenuItem><Link href="/">Lip liner</Link></DropdownMenuItem>
+                       </DropdownMenuSubContent>
+                    </DropdownMenuPortal>
+                  </DropdownMenuSub>
+
+                 <DropdownMenuItem><Link href="/coming-soon">New Arrivals</Link></DropdownMenuItem>
+                 <DropdownMenuItem><Link href="/coming-soon">Best Sellers</Link></DropdownMenuItem>
+
+                 <DropdownMenuSub>
+                   <DropdownMenuSubTrigger>
+                     <span>Exciting Combos</span>
+                   </DropdownMenuSubTrigger>
+                   <DropdownMenuPortal>
+                     <DropdownMenuSubContent>
+                        <DropdownMenuItem><Link href="/">Value Sets</Link></DropdownMenuItem>
+                        <DropdownMenuItem><Link href="/">Limited-Time Offers</Link></DropdownMenuItem>
+                      </DropdownMenuSubContent>
+                   </DropdownMenuPortal>
+                 </DropdownMenuSub>
+
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Render remaining base links */}
+            <Link
+               key={baseNavLinks[2].href + baseNavLinks[2].label + '-desktop'}
+               href={baseNavLinks[2].href}
+               className="text-foreground transition-colors hover:text-primary"
+            >
+              {baseNavLinks[2].label}
+           </Link>
         </nav>
 
         {/* Search and Actions */}
@@ -119,12 +233,13 @@ export function Header({ onSearchChange }: HeaderProps) {
                 value={localSearchTerm}
                 onChange={handleSearchInputChange}
                 aria-label="Search products"
+                suppressHydrationWarning // Added to help with potential hydration issues
               />
             </div>
           )}
 
            <Link href="/checkout" legacyBehavior passHref>
-             <Button variant="ghost" size="icon" aria-label="Shopping Cart" className="relative">
+             <Button variant="ghost" size="icon" aria-label="Shopping Cart" className="relative" suppressHydrationWarning>
                <ShoppingCart className="h-5 w-5" />
                {/* Only render badge on client after mount to prevent hydration mismatch */}
                {isClientMounted && totalItems > 0 && (
@@ -139,36 +254,22 @@ export function Header({ onSearchChange }: HeaderProps) {
            </Link>
            {/* Link for larger screens */}
            <Link href="/login" passHref legacyBehavior>
-             <Button variant="outline" size="sm" className="hidden sm:inline-flex" aria-label="Admin Login">
+             <Button variant="outline" size="sm" className="hidden sm:inline-flex" aria-label="Admin Login" suppressHydrationWarning>
                <LogIn className="mr-1.5 h-4 w-4" />
                Admin
              </Button>
            </Link>
             {/* Link for smaller screens */}
            <Link href="/login" passHref legacyBehavior>
-             <Button variant="ghost" size="icon" className="sm:hidden" aria-label="Admin Login">
+             <Button variant="ghost" size="icon" className="sm:hidden" aria-label="Admin Login" suppressHydrationWarning>
                <LogIn className="h-5 w-5" />
              </Button>
            </Link>
         </div>
 
       </div>
-        {/* Search bar shown below header on small screens (moved inside mobile menu) */}
-       {/* {onSearchChange && (
-         <div className="container pb-3 md:hidden">
-            <div className="relative w-full">
-               <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-               <Input
-                 type="search"
-                 placeholder="Search products..."
-                 className="w-full rounded-lg bg-background pl-8 h-9"
-                 value={localSearchTerm}
-                 onChange={handleSearchInputChange}
-                 aria-label="Search products"
-               />
-             </div>
-          </div>
-        )} */}
     </header>
   );
 }
+
+    
