@@ -39,7 +39,8 @@ export default function CheckoutPage() {
   const handleWhatsAppCheckout = () => {
      const message = generateWhatsAppMessage();
      const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${message}`;
-     window.open(whatsappUrl, '_blank');
+     console.log("Generated WhatsApp URL:", whatsappUrl); // Log the URL for debugging
+     window.open(whatsappUrl, '_blank', 'noopener,noreferrer'); // Added noopener,noreferrer for security
      // Optionally clear cart after sending to WhatsApp
      // clearCart();
    };
