@@ -11,7 +11,7 @@ export default function Home() {
         <ProductGrid products={mockProducts} />
       </main>
       <footer className="py-6 text-center text-sm text-muted-foreground border-t mt-12">
-        © {new Date().getFullYear()} Elegance Boutique. All rights reserved.
+        © {new Date().getFullYear()} BeYou. All rights reserved.
       </footer>
     </div>
   );
