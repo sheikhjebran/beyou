@@ -75,7 +75,7 @@ export async function getProducts(): Promise<Product[]> {
         console.error("Error fetching products from Firestore: ", error);
         // Provide more specific feedback based on the error type if possible
         if (error instanceof FirestoreError) {
-            // Common Firestore errors: 'permission-denied', 'unavailable', 'unauthenticated'
+            // Common Firestore errors: 'permission-denied', 'unavailable', 'unauthenticated', 'failed-precondition'
             console.error(`Firestore Error Code: ${error.code}`);
              if (error.code === 'permission-denied') {
                  throw new Error("Permission denied when fetching products. Check Firestore security rules.");
@@ -86,7 +86,7 @@ export async function getProducts(): Promise<Product[]> {
              } else if (error.code === 'failed-precondition' && error.message.includes('index')) {
                  // Suggest creating the index
                  console.error("Firestore index required. Please create the necessary composite index in your Firebase console.");
-                 throw new Error("Database index required for sorting/filtering. Please check server logs or Firebase console.");
+                 throw new Error("Database index required for sorting/filtering. Please check server logs or Firebase console to create the required index.");
              }
             throw new Error(`Failed to fetch products due to Firestore error: ${error.message}`);
         }
@@ -99,6 +99,7 @@ export async function getProducts(): Promise<Product[]> {
 /**
  * Fetches the most recently added or updated product from Firestore.
  * Uses the 'updatedAt' timestamp primarily, falling back to 'createdAt'.
+ * Requires a composite index: products(updatedAt DESC, createdAt DESC).
  * @returns Promise<Product | null> The most recent product or null if none exist or on error.
  */
 export async function getMostRecentProduct(): Promise<Product | null> {
@@ -149,20 +150,26 @@ export async function getMostRecentProduct(): Promise<Product | null> {
         if (error instanceof FirestoreError) {
             console.error(`Firestore Error Code: ${error.code}`);
             if (error.code === 'permission-denied') {
-                 throw new Error("Permission denied when fetching recent product. Check Firestore security rules.");
+                 console.error("Permission denied when fetching recent product. Check Firestore security rules.");
+                 // Return null for dashboard resilience
+                 return null;
              } else if (error.code === 'unauthenticated') {
-                 throw new Error("User is unauthenticated. Cannot fetch recent product.");
+                 console.error("User is unauthenticated. Cannot fetch recent product.");
+                 return null;
              } else if (error.code === 'failed-precondition' && error.message.includes('index')) {
-                 // Suggest creating the index
-                 console.error("Firestore index required for recent product query. Please create the composite index (updatedAt DESC, createdAt DESC) in your Firebase console.");
-                 throw new Error("Database index required for fetching the most recent product. Check server logs or Firebase console.");
+                 // Provide clearer guidance to create the index
+                 const indexCreationMessage = "Firestore index required for fetching the most recent product. Please create the composite index on the 'products' collection with fields 'updatedAt' (descending) and 'createdAt' (descending) in your Firebase console. The specific index needed might be provided in the Firebase console error log or link.";
+                 console.error(indexCreationMessage);
+                 // Optionally, throw a user-friendly error or return null for dashboard
+                 // throw new Error("Database configuration needed. Please check server logs or contact support.");
+                 return null; // Return null to allow the rest of the dashboard to load
+             } else {
+                 console.error(`Failed to fetch recent product due to Firestore error: ${error.message}`);
+                 return null;
              }
-            // Don't throw here for the dashboard, return null instead to allow partial loading
-            // throw new Error(`Failed to fetch recent product due to Firestore error: ${error.message}`);
-            return null;
         }
         // Fallback for generic errors - also return null for dashboard resilience
-        // throw new Error(`Failed to fetch recent product. Original error: ${error instanceof Error ? error.message : String(error)}`);
+        console.error(`Failed to fetch recent product. Original error: ${error instanceof Error ? error.message : String(error)}`);
         return null;
     }
 }
@@ -285,7 +292,7 @@ export async function updateProduct(productId: string, productData: UpdateProduc
      });
 
 
-     if (Object.keys(dataToUpdate).length === 0) {
+     if (Object.keys(dataToUpdate).length === 0 && !imageUrl) { // Check if only image was potentially updated
         console.log("No data provided for update (excluding image file).");
          return; // Nothing to update
      }
@@ -327,3 +334,4 @@ export async function updateProduct(productId: string, productData: UpdateProduc
 //         throw new Error("Failed to delete product.");
 //     }
 // }
+
