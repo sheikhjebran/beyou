@@ -86,7 +86,8 @@ export async function getProducts(): Promise<Product[]> {
                 throw new Error("Firestore is currently unavailable. Please try again later.");
              } else if (error.code === 'failed-precondition' && error.message.includes('index')) {
                  // Suggest creating the index
-                 console.error("Firestore index required for sorting by name. Please create the necessary index on the 'products' collection for the 'name' field (ascending) in your Firebase console.");
+                 const indexCreationMessage = `Firestore index required for sorting/filtering products. Please create the necessary index in your Firebase console. Error: ${error.message}`;
+                 console.error(indexCreationMessage);
                  throw new Error("Database index required for sorting/filtering. Please check server logs or Firebase console to create the required index.");
              }
             throw new Error(`Failed to fetch products due to Firestore error: ${error.message}`);
@@ -159,9 +160,8 @@ export async function getMostRecentProduct(): Promise<Product | null> {
                  return null;
              } else if (error.code === 'failed-precondition' && error.message.includes('index')) {
                  // Provide clearer guidance to create the index
-                 const indexCreationMessage = "Firestore index required for fetching the most recent product. Please create the composite index on the 'products' collection with fields 'updatedAt' (descending) and 'createdAt' (descending) in your Firebase console. The specific index needed might be provided in the Firebase console error log or link.";
+                 const indexCreationMessage = `ACTION REQUIRED: Firestore index missing for fetching the most recent product. This feature requires a composite index on the 'products' collection with fields 'updatedAt' (descending) and 'createdAt' (descending). Please create this index in your Firebase console. The error message provides a direct link: ${error.message}`;
                  console.error(indexCreationMessage);
-                 console.error("You might be able to create it using this link (requires Firebase Console access):", error.message.substring(error.message.indexOf('https://')));
                  // Optionally, throw a user-friendly error or return null for dashboard
                  // throw new Error("Database configuration needed. Please check server logs or contact support.");
                  return null; // Return null to allow the rest of the dashboard to load
