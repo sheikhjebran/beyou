@@ -160,11 +160,32 @@ export async function getMostRecentProduct(): Promise<Product | null> {
                  return null;
              } else if (error.code === 'failed-precondition' && error.message.includes('index')) {
                  // Provide clearer guidance to create the index
-                 const indexCreationMessage = `ACTION REQUIRED: Firestore index missing for fetching the most recent product. This feature requires a composite index on the 'products' collection with fields 'updatedAt' (descending) and 'createdAt' (descending). Please create this index in your Firebase console. The error message provides a direct link: ${error.message}`;
+                 const indexCreationMessage = `
+##############################################################################
+# ACTION REQUIRED: Firestore Index Missing                                   #
+##############################################################################
+#
+# The query to fetch the most recent product requires a Firestore index.
+# Please create this index in your Firebase Console for the 'products' collection.
+#
+# Required Index Fields:
+# 1. updatedAt (Descending)
+# 2. createdAt (Descending)
+#
+# You can often create this index directly using the link provided in the
+# original Firebase error message (check your server logs or browser console).
+#
+# Example Error Link:
+# ${error.message.match(/https?:\/\/[^\s]+/)?.[0] || 'See Firebase Console logs for the creation link.'}
+#
+# Once the index is built (this may take a few minutes), this feature
+# should work correctly. The application will show 'N/A' until then.
+#
+##############################################################################
+`;
                  console.error(indexCreationMessage);
-                 // Optionally, throw a user-friendly error or return null for dashboard
-                 // throw new Error("Database configuration needed. Please check server logs or contact support.");
-                 return null; // Return null to allow the rest of the dashboard to load
+                 // Return null to allow the rest of the dashboard to load gracefully
+                 return null;
              } else {
                  console.error(`Failed to fetch recent product due to Firestore error: ${error.message}`);
                  return null;
