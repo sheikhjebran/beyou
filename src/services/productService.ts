@@ -1,7 +1,7 @@
 'use server'; // Required for server-side actions
 
 import { db, storage } from '@/lib/firebase';
-import { collection, getDocs, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, addDoc, doc, updateDoc, serverTimestamp, FirestoreError } from 'firebase/firestore'; // Import FirestoreError
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { Product } from '@/types/product';
 
@@ -25,17 +25,30 @@ export type UpdateProductData = Partial<Omit<Product, 'id' | 'imageUrl'>> & {
  */
 export async function getProducts(): Promise<Product[]> {
     try {
+        console.log("Attempting to fetch products from Firestore...");
         const productsCollection = collection(db, 'products');
         const productSnapshot = await getDocs(productsCollection);
         const productList = productSnapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data(),
         })) as Product[];
-        console.log("Fetched products:", productList); // Log fetched products
+        console.log(`Successfully fetched ${productList.length} products.`);
         return productList;
     } catch (error) {
-        console.error("Error fetching products: ", error);
-        throw new Error("Failed to fetch products."); // Throw specific error
+        console.error("Error fetching products from Firestore: ", error);
+        // Provide more specific feedback based on the error type if possible
+        if (error instanceof FirestoreError) {
+            // Common Firestore errors: 'permission-denied', 'unavailable', 'unauthenticated'
+            console.error(`Firestore Error Code: ${error.code}`);
+             if (error.code === 'permission-denied') {
+                 throw new Error("Permission denied when fetching products. Check Firestore security rules.");
+             } else if (error.code === 'unauthenticated') {
+                 throw new Error("User is unauthenticated. Cannot fetch products.");
+            }
+            throw new Error(`Failed to fetch products due to Firestore error: ${error.message}`);
+        }
+        // Fallback for generic errors
+        throw new Error(`Failed to fetch products. Original error: ${error instanceof Error ? error.message : String(error)}`);
     }
 }
 
