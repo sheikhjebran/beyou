@@ -9,7 +9,8 @@ export default function ContactPage() {
       <Header />
       <main className="flex-1 container mx-auto p-6">
         <section className="my-12">
-          <h1 className="text-4xl font-bold text-center mb-10 text-primary">Contact Us</h1>
+          {/* Updated h1 to use text-foreground for black color */}
+          <h1 className="text-4xl font-bold text-center mb-10 text-foreground">Contact Us</h1>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <Card className="shadow-lg">
               <CardHeader>
