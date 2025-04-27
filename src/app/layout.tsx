@@ -1,3 +1,4 @@
+
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google'; // Using Inter font for a clean look
 import './globals.css';
@@ -18,8 +19,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      {/* Removed suppressHydrationWarning from body, keep it on html if needed for theme switching etc. */}
-      <body className={`${inter.variable} font-sans antialiased`}>
+      {/* Add suppressHydrationWarning to body to help with browser extension issues */}
+      <body className={`${inter.variable} font-sans antialiased`} suppressHydrationWarning>
         <CartProvider>
           {children}
           <Toaster />
