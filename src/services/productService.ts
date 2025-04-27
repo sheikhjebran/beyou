@@ -67,6 +67,15 @@ async function uploadImage(file: File): Promise<string> {
         return downloadURL;
     } catch (error) {
         console.error("Error uploading image: ", error);
+        // Add more details if storage error
+        if (error instanceof Error && 'code' in error) {
+             const storageErrorCode = (error as any).code; // Firebase storage errors often have a code property
+             console.error(`Firebase Storage Error Code: ${storageErrorCode}`);
+             if (storageErrorCode === 'storage/unauthorized') {
+                 throw new Error("Permission denied for image upload. Check Storage security rules.");
+             }
+             throw new Error(`Image upload failed due to Storage error: ${storageErrorCode}`);
+        }
         throw new Error("Image upload failed.");
     }
 }
@@ -86,7 +95,9 @@ export async function addProduct(productData: AddProductData): Promise<string> {
             imageUrl = await uploadImage(productData.imageFile);
         } catch (error) {
             console.error("Image upload failed, using default image.", error);
-            // Continue with default image URL if upload fails
+            // Re-throw the specific upload error to inform the user
+            if (error instanceof Error) throw error;
+            throw new Error("Image upload failed unexpectedly.");
         }
     }
 
@@ -102,8 +113,18 @@ export async function addProduct(productData: AddProductData): Promise<string> {
         console.log("Product added with ID: ", docRef.id);
         return docRef.id;
     } catch (error) {
-        console.error("Error adding product: ", error);
-        throw new Error("Failed to add product.");
+        console.error("Error adding product to Firestore: ", error);
+         if (error instanceof FirestoreError) {
+            console.error(`Firestore Error Code: ${error.code}`);
+            if (error.code === 'permission-denied') {
+                 throw new Error("Permission denied when adding product. Check Firestore security rules.");
+             } else if (error.code === 'unauthenticated') {
+                 throw new Error("User is unauthenticated. Cannot add product.");
+            }
+            throw new Error(`Failed to add product due to Firestore error: ${error.message}`);
+        }
+        // Fallback for generic errors
+        throw new Error(`Failed to add product. Original error: ${error instanceof Error ? error.message : String(error)}`);
     }
 }
 
@@ -122,8 +143,9 @@ export async function updateProduct(productId: string, productData: UpdateProduc
         try {
             imageUrl = await uploadImage(productData.imageFile);
         } catch (error) {
-            console.error("New image upload failed.", error);
-             throw new Error("New image upload failed."); // Optionally stop update if image fails
+            console.error("New image upload failed during update.", error);
+            if (error instanceof Error) throw error; // Re-throw specific upload error
+            throw new Error("New image upload failed unexpectedly during update.");
          }
     }
 
@@ -156,8 +178,18 @@ export async function updateProduct(productId: string, productData: UpdateProduc
         });
         console.log("Product updated with ID: ", productId);
     } catch (error) {
-        console.error("Error updating product: ", error);
-        throw new Error("Failed to update product.");
+        console.error("Error updating product in Firestore: ", error);
+         if (error instanceof FirestoreError) {
+            console.error(`Firestore Error Code: ${error.code}`);
+            if (error.code === 'permission-denied') {
+                 throw new Error("Permission denied when updating product. Check Firestore security rules.");
+             } else if (error.code === 'unauthenticated') {
+                 throw new Error("User is unauthenticated. Cannot update product.");
+            }
+            throw new Error(`Failed to update product due to Firestore error: ${error.message}`);
+        }
+        // Fallback for generic errors
+        throw new Error(`Failed to update product. Original error: ${error instanceof Error ? error.message : String(error)}`);
     }
 }
 
