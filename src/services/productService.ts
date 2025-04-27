@@ -2,7 +2,7 @@
 'use server'; // Required for server-side actions
 
 import { db, storage } from '@/lib/firebase';
-import { collection, getDocs, addDoc, doc, updateDoc, serverTimestamp, FirestoreError } from 'firebase/firestore'; // Import FirestoreError
+import { collection, getDocs, addDoc, doc, updateDoc, serverTimestamp, FirestoreError, query, orderBy, limit, Timestamp } from 'firebase/firestore'; // Import FirestoreError, query, orderBy, limit, Timestamp
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { Product } from '@/types/product';
 
@@ -10,28 +10,48 @@ import type { Product } from '@/types/product';
 const DEFAULT_IMAGE_URL = 'https://picsum.photos/seed/productplaceholder/400/300';
 
 // Type for adding a new product (omits id, includes File for image)
-export type AddProductData = Omit<Product, 'id' | 'imageUrl'> & {
+export type AddProductData = Omit<Product, 'id' | 'imageUrl' | 'createdAt' | 'updatedAt'> & { // Exclude timestamps
     imageFile?: File | null;
 };
 
 // Type for updating an existing product (optional fields, includes File for image)
-export type UpdateProductData = Partial<Omit<Product, 'id' | 'imageUrl'>> & {
+export type UpdateProductData = Partial<Omit<Product, 'id' | 'imageUrl' | 'createdAt' | 'updatedAt'>> & { // Exclude timestamps
     imageFile?: File | null;
+};
+
+// Helper to convert Firestore Timestamp to a serializable format (ISO string)
+// Returns null if the timestamp is invalid or missing
+const serializeTimestamp = (timestamp: unknown): string | null => {
+  if (timestamp instanceof Timestamp) {
+    return timestamp.toDate().toISOString();
+  }
+  // Handle cases where timestamp might already be a string or number (e.g., from previous storage)
+  if (typeof timestamp === 'string') {
+     // Could add validation here if needed
+     return timestamp;
+  }
+  if (typeof timestamp === 'number') {
+      return new Date(timestamp).toISOString();
+  }
+  return null;
 };
 
 
 /**
  * Fetches all products from the Firestore 'products' collection.
  * Returns only serializable fields suitable for client components.
+ * Products are sorted by name by default in Firestore unless otherwise specified.
  * @returns Promise<Product[]> An array of products.
  */
 export async function getProducts(): Promise<Product[]> {
     try {
         console.log("Attempting to fetch products from Firestore...");
         const productsCollection = collection(db, 'products');
-        const productSnapshot = await getDocs(productsCollection);
+        // Optional: Add sorting if needed for the main list, e.g., orderBy('name', 'asc')
+        const q = query(productsCollection, orderBy('name', 'asc'));
+        const productSnapshot = await getDocs(q); // Use the query 'q' here
 
-        // Map documents to Product type, explicitly excluding non-serializable fields like Timestamps
+        // Map documents to Product type, ensuring serializable fields
         const productList = productSnapshot.docs.map(doc => {
              const data = doc.data();
              // Ensure only fields defined in the Product type are included
@@ -43,6 +63,9 @@ export async function getProducts(): Promise<Product[]> {
                 price: data.price,
                 imageUrl: data.imageUrl || DEFAULT_IMAGE_URL, // Use default if imageUrl is missing
                 quantity: data.quantity,
+                // Timestamps are NOT included here to avoid serialization issues for client components
+                // createdAt: serializeTimestamp(data.createdAt),
+                // updatedAt: serializeTimestamp(data.updatedAt),
             } as Product; // Assert the final shape matches the Product type
         });
 
@@ -60,6 +83,10 @@ export async function getProducts(): Promise<Product[]> {
                  throw new Error("User is unauthenticated. Cannot fetch products.");
              } else if (error.code === 'unavailable') {
                 throw new Error("Firestore is currently unavailable. Please try again later.");
+             } else if (error.code === 'failed-precondition' && error.message.includes('index')) {
+                 // Suggest creating the index
+                 console.error("Firestore index required. Please create the necessary composite index in your Firebase console.");
+                 throw new Error("Database index required for sorting/filtering. Please check server logs or Firebase console.");
              }
             throw new Error(`Failed to fetch products due to Firestore error: ${error.message}`);
         }
@@ -67,6 +94,79 @@ export async function getProducts(): Promise<Product[]> {
         throw new Error(`Failed to fetch products. Original error: ${error instanceof Error ? error.message : String(error)}`);
     }
 }
+
+
+/**
+ * Fetches the most recently added or updated product from Firestore.
+ * Uses the 'updatedAt' timestamp primarily, falling back to 'createdAt'.
+ * @returns Promise<Product | null> The most recent product or null if none exist or on error.
+ */
+export async function getMostRecentProduct(): Promise<Product | null> {
+    try {
+        console.log("Attempting to fetch the most recent product...");
+        const productsCollection = collection(db, 'products');
+
+        // Query for the latest product based on 'updatedAt', then 'createdAt'
+        // Firestore requires an index for queries involving multiple orderBy clauses
+        // or orderBy on one field and limit on another. Ensure this index exists:
+        // Collection: products, Fields: updatedAt DESC, createdAt DESC
+        const q = query(
+            productsCollection,
+            orderBy('updatedAt', 'desc'), // Order by most recent update first
+            orderBy('createdAt', 'desc'), // Then by most recent creation
+            limit(1) // Get only the top one
+        );
+
+        const productSnapshot = await getDocs(q);
+
+        if (productSnapshot.empty) {
+            console.log("No products found.");
+            return null;
+        }
+
+        const doc = productSnapshot.docs[0];
+        const data = doc.data();
+
+        // Map to Product type, ensuring serializable fields
+        const recentProduct: Product = {
+            id: doc.id,
+            name: data.name,
+            type: data.type,
+            description: data.description,
+            price: data.price,
+            imageUrl: data.imageUrl || DEFAULT_IMAGE_URL,
+            quantity: data.quantity,
+            // Include serialized timestamps if needed for display, otherwise omit
+            // createdAt: serializeTimestamp(data.createdAt),
+            // updatedAt: serializeTimestamp(data.updatedAt),
+        };
+
+        console.log("Successfully fetched the most recent product:", recentProduct.id);
+        return recentProduct;
+
+    } catch (error) {
+        console.error("Error fetching the most recent product: ", error);
+        if (error instanceof FirestoreError) {
+            console.error(`Firestore Error Code: ${error.code}`);
+            if (error.code === 'permission-denied') {
+                 throw new Error("Permission denied when fetching recent product. Check Firestore security rules.");
+             } else if (error.code === 'unauthenticated') {
+                 throw new Error("User is unauthenticated. Cannot fetch recent product.");
+             } else if (error.code === 'failed-precondition' && error.message.includes('index')) {
+                 // Suggest creating the index
+                 console.error("Firestore index required for recent product query. Please create the composite index (updatedAt DESC, createdAt DESC) in your Firebase console.");
+                 throw new Error("Database index required for fetching the most recent product. Check server logs or Firebase console.");
+             }
+            // Don't throw here for the dashboard, return null instead to allow partial loading
+            // throw new Error(`Failed to fetch recent product due to Firestore error: ${error.message}`);
+            return null;
+        }
+        // Fallback for generic errors - also return null for dashboard resilience
+        // throw new Error(`Failed to fetch recent product. Original error: ${error instanceof Error ? error.message : String(error)}`);
+        return null;
+    }
+}
+
 
 /**
  * Uploads an image file to Firebase Storage.
@@ -99,6 +199,7 @@ async function uploadImage(file: File): Promise<string> {
 /**
  * Adds a new product to the Firestore 'products' collection.
  * Uploads an image if provided, otherwise uses a default image.
+ * Includes 'createdAt' and 'updatedAt' timestamps.
  * @param productData The data for the new product, including an optional image file.
  * @returns Promise<string> The ID of the newly added product document.
  */
@@ -118,13 +219,15 @@ export async function addProduct(productData: AddProductData): Promise<string> {
     }
 
     const { imageFile, ...dataToSave } = productData; // Exclude imageFile from Firestore data
+    const now = serverTimestamp(); // Get the server timestamp
 
     try {
         const productsCollection = collection(db, 'products');
         const docRef = await addDoc(productsCollection, {
             ...dataToSave,
             imageUrl: imageUrl, // Add the final image URL
-            createdAt: serverTimestamp(), // Add a timestamp for server-side sorting/tracking if needed
+            createdAt: now, // Add creation timestamp
+            updatedAt: now, // Initialize update timestamp
         });
         console.log("Product added with ID: ", docRef.id);
         return docRef.id;
@@ -147,6 +250,7 @@ export async function addProduct(productData: AddProductData): Promise<string> {
 /**
  * Updates an existing product in the Firestore 'products' collection.
  * Optionally uploads a new image if provided.
+ * Updates the 'updatedAt' timestamp.
  * @param productId The ID of the product to update.
  * @param productData The data to update, including an optional new image file.
  * @returns Promise<void>
@@ -191,7 +295,7 @@ export async function updateProduct(productId: string, productData: UpdateProduc
         const productDoc = doc(db, 'products', productId);
         await updateDoc(productDoc, {
              ...dataToUpdate,
-             updatedAt: serverTimestamp(), // Add an update timestamp
+             updatedAt: serverTimestamp(), // Update the timestamp
         });
         console.log("Product updated with ID: ", productId);
     } catch (error) {
@@ -211,6 +315,7 @@ export async function updateProduct(productId: string, productData: UpdateProduc
 }
 
 // Placeholder for deleteProduct function if needed in the future
+// import { deleteDoc } from 'firebase/firestore';
 // export async function deleteProduct(productId: string): Promise<void> {
 //     try {
 //         const productDoc = doc(db, 'products', productId);

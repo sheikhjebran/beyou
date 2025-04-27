@@ -1,7 +1,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { LayoutDashboard, Package, PackageX, BarChart3, List, Clock, CalendarDays } from 'lucide-react'; // Added CalendarDays
-import { getProducts } from '@/services/productService';
+import { getProducts, getMostRecentProduct } from '@/services/productService'; // Import getMostRecentProduct
 import type { Product } from '@/types/product';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from 'lucide-react';
@@ -11,34 +11,42 @@ import { Button } from '@/components/ui/button';
 // Fetch data on the server
 async function getDashboardData() {
   try {
+    // Fetch all products for counts
     const products = await getProducts();
     const totalProducts = products.length;
     const zeroQuantityProducts = products.filter(p => p.quantity === 0);
-    // Placeholder for recent product - ideally sort by createdAt if available
-    // This still requires a timestamp field in the product data for accurate sorting
-    const recentProduct = products.length > 0 ? products[0] : null;
+
+    // Fetch the single most recent product separately
+    const recentProduct = await getMostRecentProduct();
+
     return {
-      products,
+      products, // Keep this if needed elsewhere, though not strictly necessary for the cards shown
       totalProducts,
       zeroQuantityProducts,
-      recentProduct, // This is just the first product fetched, not necessarily the most recent
+      recentProduct, // This is now the actual most recent product
       error: null,
     };
   } catch (error) {
     console.error("Error fetching dashboard data:", error);
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+    // Return default values on error, including the error message
     return {
       products: [],
       totalProducts: 0,
       zeroQuantityProducts: [],
       recentProduct: null,
-      error: error instanceof Error ? error.message : "An unknown error occurred",
+      error: errorMessage,
     };
   }
 }
 
 export default async function AdminDashboardPage() {
   const { totalProducts, zeroQuantityProducts, recentProduct, error } = await getDashboardData();
-  const todayDate = new Date().toLocaleDateString(); // Get today's date
+  const todayDate = new Date().toLocaleDateString('en-IN', { // Use Indian locale for date format
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
@@ -98,10 +106,10 @@ export default async function AdminDashboardPage() {
           </CardContent>
         </Card>
 
-         {/* Recent Product Card (Placeholder) */}
+         {/* Recent Product Card (Actual) */}
         <Card className="shadow-md hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Recently Added (Example)</CardTitle>
+            <CardTitle className="text-sm font-medium">Most Recent Update</CardTitle>
              <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -109,13 +117,17 @@ export default async function AdminDashboardPage() {
               <>
                 <div className="text-base font-semibold truncate">{recentProduct.name}</div>
                 <p className="text-xs text-muted-foreground">
-                    ID: {recentProduct.id.substring(0, 8)}... (Note: Needs timestamp for accuracy)
+                    ID: {recentProduct.id.substring(0, 8)}...
                 </p>
+                 {/* Display timestamp if available and needed */}
+                 {/* <p className="text-xs text-muted-foreground mt-1">
+                   Updated: {recentProduct.updatedAt ? new Date(recentProduct.updatedAt).toLocaleString() : 'N/A'}
+                 </p> */}
              </>
-            ) : (
+            ) : !error ? ( // Only show N/A if there wasn't a loading error
               <div className="text-base font-semibold">N/A</div>
-            )}
-             <p className="text-xs text-muted-foreground mt-1">Requires product creation timestamp</p>
+            ) : null}
+             {!error && !recentProduct && <p className="text-xs text-muted-foreground mt-1">No products found.</p>}
           </CardContent>
         </Card>
 
