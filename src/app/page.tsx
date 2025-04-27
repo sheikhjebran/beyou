@@ -11,7 +11,7 @@ import { getProducts } from '@/services/productService'; // Import service funct
 import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; // Import Alert
 import { AlertCircle } from 'lucide-react'; // Import icon
-
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"; // Import Card components needed for Skeleton
 
 export default function Home() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -47,6 +47,7 @@ export default function Home() {
 
   return (
     <div className="flex min-h-screen flex-col">
+      {/* Pass setSearchTerm to Header to enable search functionality */}
       <Header onSearchChange={setSearchTerm} />
       <main className="flex-1 container mx-auto">
         {/* Banner Section */}
@@ -122,6 +123,3 @@ export default function Home() {
     </div>
   );
 }
-
-// Re-add Card components for Skeleton
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";

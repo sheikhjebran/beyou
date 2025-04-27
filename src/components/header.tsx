@@ -29,8 +29,9 @@ export function Header({ onSearchChange }: HeaderProps) {
   const handleSearchInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const term = event.target.value;
     setLocalSearchTerm(term);
+    // Call the parent component's state setter if provided
     if (onSearchChange) {
-      onSearchChange(term); // Call the passed function when search changes
+      onSearchChange(term);
     }
   };
 
@@ -88,14 +89,14 @@ export function Header({ onSearchChange }: HeaderProps) {
              </Button>
            </Link>
            {/* Link for larger screens */}
-           <Link href="/login" passHref>
+           <Link href="/login" passHref legacyBehavior>
              <Button variant="outline" size="sm" className="hidden sm:inline-flex" aria-label="Admin Login">
                <LogIn className="mr-1.5 h-4 w-4" />
                Admin
              </Button>
            </Link>
             {/* Link for smaller screens */}
-           <Link href="/login" passHref>
+           <Link href="/login" passHref legacyBehavior>
              <Button variant="ghost" size="icon" className="sm:hidden" aria-label="Admin Login">
                <LogIn className="h-5 w-5" />
              </Button>
