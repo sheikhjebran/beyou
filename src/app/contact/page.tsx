@@ -1,7 +1,7 @@
 
 import { Header } from '@/components/header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Mail, Phone } from 'lucide-react';
+import { Mail, Phone, MapPin } from 'lucide-react'; // Added MapPin icon
 
 export default function ContactPage() {
   return (
@@ -19,15 +19,16 @@ export default function ContactPage() {
               <CardContent className="space-y-4">
                 <div className="flex items-center space-x-3">
                   <Mail className="h-5 w-5 text-accent" />
-                  <a href="mailto:support@beyou.com" className="text-foreground hover:text-primary transition-colors">
-                    support@beyou.com
+                  {/* Updated email */}
+                  <a href="mailto:sheikhjebran@gmail.com" className="text-foreground hover:text-primary transition-colors">
+                    sheikhjebran@gmail.com
                   </a>
                 </div>
                 <div className="flex items-center space-x-3">
                   <Phone className="h-5 w-5 text-accent" />
-                  {/* Replace with your actual phone number */}
-                  <a href="tel:+1234567890" className="text-foreground hover:text-primary transition-colors">
-                    +1 (234) 567-890
+                  {/* Updated phone number */}
+                  <a href="tel:+919945662602" className="text-foreground hover:text-primary transition-colors">
+                    +91 9945662602
                   </a>
                 </div>
                 {/* Placeholder for contact form or more info */}
@@ -42,14 +43,20 @@ export default function ContactPage() {
                  <CardDescription>Find our boutique.</CardDescription>
                </CardHeader>
                <CardContent>
-                 {/* Placeholder for map or address */}
-                 <p className="text-foreground">
-                   123 Elegance Avenue,
-                   <br />
-                   Fashion City, ST 12345
-                 </p>
+                 {/* Updated address */}
+                 <div className="flex items-start space-x-3">
+                   <MapPin className="h-5 w-5 text-accent mt-1 shrink-0" />
+                   <p className="text-foreground">
+                     Vijaynagar,
+                     <br />
+                     Bangalore, Karnataka
+                     <br />
+                     India
+                   </p>
+                 </div>
+                  {/* Placeholder for map */}
                   <div className="mt-4 h-48 bg-muted rounded-md flex items-center justify-center text-muted-foreground">
-                    Map Placeholder
+                    Map Placeholder (Vijaynagar, Bangalore)
                  </div>
                </CardContent>
              </Card>
