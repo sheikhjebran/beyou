@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ShoppingBag } from 'lucide-react';
+import { ShoppingBag, Trash2 } from 'lucide-react'; // Import Trash2 icon
 import { useCart } from '@/hooks/use-cart'; // Import useCart hook
 import { useToast } from "@/hooks/use-toast"; // Import useToast hook
 
@@ -15,15 +15,29 @@ type ProductCardProps = {
 };
 
 export function ProductCard({ product }: ProductCardProps) {
-  const { addToCart } = useCart(); // Get addToCart function
+  const { items, addToCart, removeFromCart } = useCart(); // Get items and relevant functions
   const { toast } = useToast(); // Get toast function
 
-  const handleAddToCart = () => {
-    addToCart(product);
-    toast({
-      title: "Added to Cart",
-      description: `${product.name} has been added to your cart.`,
-    });
+  // Check if the current product is in the cart
+  const isInCart = items.some(item => item.product.id === product.id);
+
+  const handleToggleCart = () => {
+    if (isInCart) {
+      // Remove from cart
+      removeFromCart(product.id);
+      toast({
+        title: "Removed from Cart",
+        description: `${product.name} has been removed from your cart.`,
+         variant: "destructive", // Optional: different style for removal
+      });
+    } else {
+      // Add to cart
+      addToCart(product);
+      toast({
+        title: "Added to Cart",
+        description: `${product.name} has been added to your cart.`,
+      });
+    }
   };
 
   return (
@@ -58,11 +72,20 @@ export function ProductCard({ product }: ProductCardProps) {
       <CardFooter className="p-4 pt-0">
          <Button
             className="w-full"
-            aria-label={`Add ${product.name} to cart`}
-            onClick={handleAddToCart} // Call handleAddToCart on click
+            aria-label={isInCart ? `Remove ${product.name} from cart` : `Add ${product.name} to cart`}
+            onClick={handleToggleCart} // Call handleToggleCart on click
+            variant={isInCart ? "outline" : "default"} // Change variant when in cart
           >
-           <ShoppingBag className="mr-2 h-4 w-4" /> Add to Cart
-         </Button>
+            {isInCart ? (
+              <>
+                <Trash2 className="mr-2 h-4 w-4" /> Remove from Cart
+              </>
+            ) : (
+              <>
+                <ShoppingBag className="mr-2 h-4 w-4" /> Add to Cart
+              </>
+            )}
+          </Button>
       </CardFooter>
     </Card>
   );
