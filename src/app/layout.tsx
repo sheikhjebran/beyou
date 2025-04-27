@@ -18,8 +18,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
+    // suppressHydrationWarning on html is often for theme switching (light/dark)
     <html lang="en" suppressHydrationWarning>
-      {/* Add suppressHydrationWarning to body to help with browser extension issues */}
+      {/* Add suppressHydrationWarning to body to help with browser extension issues like Grammarly adding attributes */}
       <body className={`${inter.variable} font-sans antialiased`} suppressHydrationWarning>
         <CartProvider>
           {children}
