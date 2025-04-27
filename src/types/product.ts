@@ -5,4 +5,5 @@ export type Product = {
   description: string;
   price: number;
   imageUrl: string;
+  quantity: number; // Added quantity field
 };

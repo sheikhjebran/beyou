@@ -1,6 +1,9 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAnalytics, isSupported } from "firebase/analytics";
+import { getFirestore } from "firebase/firestore"; // Import Firestore
+import { getStorage } from "firebase/storage"; // Import Storage
+
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
 
@@ -13,11 +16,12 @@ const firebaseConfig = {
   apiKey: "AIzaSyAZN31awa29P4MS5uFN2sMZ7G9B1DsYTZw",
   authDomain: "beyou-a4723.firebaseapp.com",
   projectId: "beyou-a4723",
-  storageBucket: "beyou-a4723.firebasestorage.app",
+  storageBucket: "beyou-a4723.appspot.com", // Corrected storage bucket domain
   messagingSenderId: "70655659032",
   appId: "1:70655659032:web:68c808f7c2b2b1ee59876d",
   measurementId: "G-7E3HPMN496"
 };
+
 
 // Initialize Firebase
 let app;
@@ -37,5 +41,9 @@ if (typeof window !== 'undefined') {
   });
 }
 
+// Initialize Firestore and Storage
+const db = getFirestore(app);
+const storage = getStorage(app);
 
-export { app, analytics }; // Export the initialized app and analytics instance
+
+export { app, analytics, db, storage }; // Export the initialized app, analytics, db, and storage instances
