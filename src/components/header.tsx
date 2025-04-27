@@ -23,12 +23,23 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"; // Import Dropdown components
-
+import { categoryStructure, getMainCategories, getSubCategories } from '@/lib/categories'; // Import categories
 
 // Define props for the Header component
 interface HeaderProps {
   onSearchChange?: (term: string) => void; // Optional callback for search input changes
 }
+
+// Helper function to create category/sub-category links
+const createFilterLink = (category: string, subCategory?: string): string => {
+    const params = new URLSearchParams();
+    params.set('category', category);
+    if (subCategory) {
+        params.set('subCategory', subCategory);
+    }
+    return `/products?${params.toString()}`;
+};
+
 
 export function Header({ onSearchChange }: HeaderProps) {
   const { getTotalItems } = useCart(); // Get cart functions
@@ -54,7 +65,7 @@ export function Header({ onSearchChange }: HeaderProps) {
   // Base Navigation Links Array (excluding categories dropdown)
   const baseNavLinks = [
     { href: "/", label: "Home" },
-    { href: "/#products", label: "All Products" },
+    { href: "/#products", label: "All Products" }, // Scrolls down on home page
     // Category dropdown will be handled separately
     { href: "/contact", label: "Contact Us" },
   ];
@@ -62,7 +73,7 @@ export function Header({ onSearchChange }: HeaderProps) {
   // Mobile Navigation Links (includes a simple Categories link for now)
    const mobileNavLinks = [
      ...baseNavLinks.slice(0, 2), // Home, All Products
-     { href: "/", label: "Categories" }, // Simple link for mobile
+     { href: "/products", label: "Categories" }, // Link to main products/category page for mobile
      ...baseNavLinks.slice(2) // Contact Us
    ];
 
@@ -144,68 +155,32 @@ export function Header({ onSearchChange }: HeaderProps) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56">
-                 <DropdownMenuSub>
-                   <DropdownMenuSubTrigger>
-                     <span>K-Beauty</span>
-                   </DropdownMenuSubTrigger>
-                   <DropdownMenuPortal>
-                     <DropdownMenuSubContent>
-                       <DropdownMenuItem><Link href="/">Lip Gloss</Link></DropdownMenuItem>
-                       <DropdownMenuItem><Link href="/">Matte Lipstick</Link></DropdownMenuItem>
-                       <DropdownMenuItem><Link href="/">Liquid Matte Lipstick</Link></DropdownMenuItem>
-                       <DropdownMenuItem><Link href="/">Lip and Cheek Tint</Link></DropdownMenuItem>
-                       <DropdownMenuItem><Link href="/">Water Tint</Link></DropdownMenuItem>
-                       <DropdownMenuItem><Link href="/">Highlighters</Link></DropdownMenuItem>
-                       <DropdownMenuItem><Link href="/">Liquid Blush</Link></DropdownMenuItem>
-                       <DropdownMenuItem><Link href="/">Powder Blush</Link></DropdownMenuItem>
-                     </DropdownMenuSubContent>
-                   </DropdownMenuPortal>
-                 </DropdownMenuSub>
+                 {/* Dynamically generate categories and sub-categories */}
+                 {getMainCategories().map((category) => (
+                     // Skip categories that are direct links like 'New Arrivals' if handled separately
+                     category !== 'New Arrivals' && category !== 'Best Sellers' ? (
+                         <DropdownMenuSub key={category}>
+                             <DropdownMenuSubTrigger>
+                                 {/* Link for the main category */}
+                                 <Link href={createFilterLink(category)} className="flex-1">{category}</Link>
+                             </DropdownMenuSubTrigger>
+                             <DropdownMenuPortal>
+                                 <DropdownMenuSubContent>
+                                     {getSubCategories(category).map((subCategory) => (
+                                         <DropdownMenuItem key={subCategory}>
+                                             {/* Link for the sub-category */}
+                                             <Link href={createFilterLink(category, subCategory)}>{subCategory}</Link>
+                                         </DropdownMenuItem>
+                                     ))}
+                                 </DropdownMenuSubContent>
+                             </DropdownMenuPortal>
+                         </DropdownMenuSub>
+                     ) : null
+                 ))}
 
-                 <DropdownMenuSub>
-                   <DropdownMenuSubTrigger>
-                     <span>Nails</span>
-                   </DropdownMenuSubTrigger>
-                   <DropdownMenuPortal>
-                     <DropdownMenuSubContent>
-                       <DropdownMenuItem><Link href="/">Press-On Nails</Link></DropdownMenuItem>
-                       <DropdownMenuItem><Link href="/">Nail glue</Link></DropdownMenuItem>
-                       <DropdownMenuItem><Link href="/">Nail filers</Link></DropdownMenuItem>
-                     </DropdownMenuSubContent>
-                   </DropdownMenuPortal>
-                 </DropdownMenuSub>
-
-                 <DropdownMenuSub>
-                   <DropdownMenuSubTrigger>
-                      <span>Brands</span>
-                   </DropdownMenuSubTrigger>
-                    <DropdownMenuPortal>
-                      <DropdownMenuSubContent>
-                        {/* <DropdownMenuItem><Link href="/">Be You by Ayesha Banu</Link></DropdownMenuItem> */}
-                        <DropdownMenuLabel className="font-normal text-muted-foreground text-xs">Top Picks</DropdownMenuLabel>
-                         <DropdownMenuItem><Link href="/">Gloss</Link></DropdownMenuItem>
-                         <DropdownMenuItem><Link href="/">Lipstick</Link></DropdownMenuItem>
-                         <DropdownMenuItem><Link href="/">Blush</Link></DropdownMenuItem>
-                         <DropdownMenuItem><Link href="/">Highlighter</Link></DropdownMenuItem>
-                         <DropdownMenuItem><Link href="/">Lip liner</Link></DropdownMenuItem>
-                       </DropdownMenuSubContent>
-                    </DropdownMenuPortal>
-                  </DropdownMenuSub>
-
+                 {/* Direct links for Coming Soon pages */}
                  <DropdownMenuItem><Link href="/coming-soon">New Arrivals</Link></DropdownMenuItem>
                  <DropdownMenuItem><Link href="/coming-soon">Best Sellers</Link></DropdownMenuItem>
-
-                 <DropdownMenuSub>
-                   <DropdownMenuSubTrigger>
-                     <span>Exciting Combos</span>
-                   </DropdownMenuSubTrigger>
-                   <DropdownMenuPortal>
-                     <DropdownMenuSubContent>
-                        <DropdownMenuItem><Link href="/">Value Sets</Link></DropdownMenuItem>
-                        <DropdownMenuItem><Link href="/">Limited-Time Offers</Link></DropdownMenuItem>
-                      </DropdownMenuSubContent>
-                   </DropdownMenuPortal>
-                 </DropdownMenuSub>
 
               </DropdownMenuContent>
             </DropdownMenu>
@@ -271,5 +246,3 @@ export function Header({ onSearchChange }: HeaderProps) {
     </header>
   );
 }
-
-    
