@@ -73,9 +73,9 @@ export default function CheckoutPage() {
                     <TableHead className="w-[100px]">Product</TableHead>
                     <TableHead>Details</TableHead>
                     <TableHead className="text-center">Quantity</TableHead>
-                    <TableHead className="text-right">Price (₹)</TableHead> {/* Updated Header */}
-                    <TableHead className="text-right">Total (₹)</TableHead> {/* Updated Header */}
-                    <TableHead className="w-[50px]"></TableHead> {/* Remove action */}
+                    <TableHead className="text-right">Price (₹)</TableHead>{/* Updated Header */}
+                    <TableHead className="text-right">Total (₹)</TableHead>{/* Updated Header */}
+                    <TableHead className="w-[50px]"></TableHead>{/* Remove action */}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -137,7 +137,7 @@ export default function CheckoutPage() {
                       <TableCell colSpan={4} className="text-right font-bold text-lg text-foreground">Total</TableCell>
                       {/* Updated currency symbol and ensured black text via text-foreground */}
                       <TableCell className="text-right font-bold text-lg text-foreground">₹{totalPrice.toFixed(2)}</TableCell>
-                      <TableCell></TableCell> {/* Empty cell for alignment */}
+                      <TableCell></TableCell>{/* Empty cell for alignment */}
                     </TableRow>
                   </TableFooter>
               </Table>
