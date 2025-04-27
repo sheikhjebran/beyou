@@ -1,6 +1,7 @@
+
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; // Added useEffect
 import { useRouter } from 'next/navigation';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -16,11 +17,15 @@ import { useToast } from "@/hooks/use-toast";
 import { addProduct, type AddProductData } from '@/services/productService'; // Import service
 import { Loader2, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { getMainCategories, getSubCategories, type Category } from '@/lib/categories'; // Import category helpers
 
-// Define Zod schema for validation
+
+// Define Zod schema for validation including categories
 const productFormSchema = z.object({
   name: z.string().min(3, { message: "Product name must be at least 3 characters." }),
-  type: z.enum(['Beauty', 'Clothing'], { required_error: "Please select a product type." }),
+  type: z.enum(['Beauty', 'Clothing'], { required_error: "Please select a product type." }), // Keep if still relevant for broad filtering
+  category: z.string().min(1, { message: "Please select a category." }), // Main category
+  subCategory: z.string().min(1, { message: "Please select a sub-category." }), // Sub category
   description: z.string().min(10, { message: "Description must be at least 10 characters." }),
   price: z.coerce.number().min(0.01, { message: "Price must be a positive number." }),
   quantity: z.coerce.number().int().min(0, { message: "Quantity must be a non-negative integer." }),
@@ -38,19 +43,37 @@ export default function AddProductPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [availableSubCategories, setAvailableSubCategories] = useState<string[]>([]); // State for dynamic sub-categories
 
-   const form = useForm<ProductFormValues>({
+  const form = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
     defaultValues: {
       name: '',
       type: undefined,
+      category: '', // Initialize category
+      subCategory: '', // Initialize subCategory
       description: '',
       price: 0,
       quantity: 0,
       imageFile: null,
     },
   });
+
+  // Watch the 'category' field to update sub-categories
+  const selectedCategory = form.watch('category');
+
+  useEffect(() => {
+    if (selectedCategory) {
+      const subs = getSubCategories(selectedCategory as Category); // Fetch sub-categories
+      setAvailableSubCategories(subs);
+      form.setValue('subCategory', ''); // Reset subCategory when category changes
+    } else {
+      setAvailableSubCategories([]);
+      form.setValue('subCategory', ''); // Clear subCategory if no category selected
+    }
+  }, [selectedCategory, form]);
+
 
    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
      const file = event.target.files?.[0];
@@ -76,6 +99,8 @@ export default function AddProductPage() {
     const productData: AddProductData = {
         name: data.name,
         type: data.type,
+        category: data.category, // Include category
+        subCategory: data.subCategory, // Include subCategory
         description: data.description,
         price: data.price,
         quantity: data.quantity,
@@ -88,6 +113,9 @@ export default function AddProductPage() {
         title: "Product Added",
         description: `Product "${data.name}" (ID: ${newProductId}) has been successfully added.`,
       });
+      form.reset(); // Reset form after successful submission
+      setPreviewUrl(null); // Clear image preview
+      setAvailableSubCategories([]); // Clear sub-categories
       router.push('/admin/inventory'); // Redirect back to inventory list
     } catch (error) {
        console.error("Error adding product:", error);
@@ -136,22 +164,80 @@ export default function AddProductPage() {
                   )}
                 />
 
-                {/* Product Type */}
+                 {/* Product Type (keep if used for filtering/display, otherwise optional) */}
+                  <FormField
+                    control={form.control}
+                    name="type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Product Type (Broad)</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a type (e.g., Beauty, Clothing)" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Beauty">Beauty</SelectItem>
+                            <SelectItem value="Clothing">Clothing</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                 {/* Main Category Dropdown */}
+                  <FormField
+                    control={form.control}
+                    name="category"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Category</FormLabel>
+                        <Select
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            // No need to manually call getSubCategories here, useEffect handles it
+                          }}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select main category" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {getMainCategories().map((cat) => (
+                              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                 {/* Sub-Category Dropdown (Dynamic) */}
                  <FormField
                    control={form.control}
-                   name="type"
+                   name="subCategory"
                    render={({ field }) => (
                      <FormItem>
-                       <FormLabel>Product Type</FormLabel>
-                       <Select onValueChange={field.onChange} defaultValue={field.value}>
+                       <FormLabel>Sub-Category</FormLabel>
+                       <Select
+                         onValueChange={field.onChange}
+                         value={field.value} // Controlled component
+                         disabled={!selectedCategory || availableSubCategories.length === 0} // Disable if no category or sub-categories
+                       >
                          <FormControl>
                            <SelectTrigger>
-                             <SelectValue placeholder="Select a type" />
+                             <SelectValue placeholder={selectedCategory ? "Select sub-category" : "Select category first"} />
                            </SelectTrigger>
                          </FormControl>
                          <SelectContent>
-                           <SelectItem value="Beauty">Beauty</SelectItem>
-                           <SelectItem value="Clothing">Clothing</SelectItem>
+                           {availableSubCategories.map((subCat) => (
+                             <SelectItem key={subCat} value={subCat}>{subCat}</SelectItem>
+                           ))}
                          </SelectContent>
                        </Select>
                        <FormMessage />
@@ -210,15 +296,14 @@ export default function AddProductPage() {
                  <FormField
                    control={form.control}
                    name="imageFile"
-                   render={({ field }) => (
+                   render={({ field }) => ( // No need to manage file state separately, RHF handles it
                      <FormItem>
                        <FormLabel>Product Image (Optional)</FormLabel>
                        <FormControl>
-                          {/* Use a basic file input, ShadCN doesn't have a dedicated one yet */}
                            <Input
                               type="file"
                               accept="image/png, image/jpeg, image/webp"
-                              onChange={handleFileChange} // Use custom handler
+                              onChange={handleFileChange} // Use custom handler to update RHF and preview
                               className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
                            />
                        </FormControl>
@@ -234,7 +319,7 @@ export default function AddProductPage() {
                   />
 
 
-                 <Button type="submit" disabled={isSubmitting} className="w-full md:w-auto">
+                 <Button type="submit" disabled={isSubmitting || !form.formState.isValid} className="w-full md:w-auto">
                    {isSubmitting ? (
                       <>
                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />

@@ -5,16 +5,19 @@ import { db, storage } from '@/lib/firebase';
 import { collection, getDocs, addDoc, doc, updateDoc, serverTimestamp, FirestoreError, query, orderBy, limit, Timestamp, getDoc } from 'firebase/firestore'; // Import FirestoreError, query, orderBy, limit, Timestamp, getDoc
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { Product } from '@/types/product';
+import { getMainCategories, getSubCategories } from '@/lib/categories'; // Import category helpers
 
 // Default placeholder image URL
 const DEFAULT_IMAGE_URL = 'https://picsum.photos/seed/productplaceholder/400/300';
 
 // Type for adding a new product (omits id, includes File for image)
+// Now includes category and subCategory
 export type AddProductData = Omit<Product, 'id' | 'imageUrl' | 'createdAt' | 'updatedAt'> & { // Exclude timestamps
     imageFile?: File | null;
 };
 
 // Type for updating an existing product (optional fields, includes File for image)
+// Now includes optional category and subCategory
 export type UpdateProductData = Partial<Omit<Product, 'id' | 'imageUrl' | 'createdAt' | 'updatedAt'>> & { // Exclude timestamps
     imageFile?: File | null;
 };
@@ -58,7 +61,9 @@ export async function getProducts(): Promise<Product[]> {
              const product: Product = {
                 id: doc.id,
                 name: data.name,
-                type: data.type,
+                type: data.type ?? 'Beauty', // Provide default if missing
+                category: data.category ?? 'Other', // Provide default if missing
+                subCategory: data.subCategory ?? 'Miscellaneous', // Provide default if missing
                 description: data.description,
                 price: data.price,
                 imageUrl: data.imageUrl || DEFAULT_IMAGE_URL, // Use default if imageUrl is missing
@@ -134,7 +139,9 @@ export async function getMostRecentProduct(): Promise<Product | null> {
         const recentProduct: Product = {
             id: doc.id,
             name: data.name,
-            type: data.type,
+            type: data.type ?? 'Beauty', // Provide default if missing
+            category: data.category ?? 'Other', // Provide default if missing
+            subCategory: data.subCategory ?? 'Miscellaneous', // Provide default if missing
             description: data.description,
             price: data.price,
             imageUrl: data.imageUrl || DEFAULT_IMAGE_URL,
@@ -218,7 +225,9 @@ export async function getProductById(productId: string): Promise<Product | null>
     const product: Product = {
       id: productDoc.id,
       name: data.name,
-      type: data.type,
+      type: data.type ?? 'Beauty', // Provide default if missing
+      category: data.category ?? 'Other', // Provide default if missing
+      subCategory: data.subCategory ?? 'Miscellaneous', // Provide default if missing
       description: data.description,
       price: data.price,
       imageUrl: data.imageUrl || DEFAULT_IMAGE_URL,
@@ -277,11 +286,23 @@ async function uploadImage(file: File): Promise<string> {
  * Adds a new product to the Firestore 'products' collection.
  * Uploads an image if provided, otherwise uses a default image.
  * Includes 'createdAt' and 'updatedAt' timestamps.
+ * Includes category and subCategory.
  * @param productData The data for the new product, including an optional image file.
  * @returns Promise<string> The ID of the newly added product document.
  */
 export async function addProduct(productData: AddProductData): Promise<string> {
     let imageUrl = DEFAULT_IMAGE_URL;
+
+    // Validate category and subCategory
+    const validCategories = getMainCategories();
+    if (!validCategories.includes(productData.category as any)) {
+        throw new Error(`Invalid category provided: ${productData.category}`);
+    }
+    const validSubCategories = getSubCategories(productData.category as any);
+    if (!validSubCategories.includes(productData.subCategory as any)) {
+        throw new Error(`Invalid subCategory "${productData.subCategory}" for category "${productData.category}"`);
+    }
+
 
     // Upload image if provided
     if (productData.imageFile) {
@@ -328,12 +349,46 @@ export async function addProduct(productData: AddProductData): Promise<string> {
  * Updates an existing product in the Firestore 'products' collection.
  * Optionally uploads a new image if provided.
  * Updates the 'updatedAt' timestamp.
+ * Validates category and subCategory if they are being updated.
  * @param productId The ID of the product to update.
  * @param productData The data to update, including an optional new image file.
  * @returns Promise<void>
  */
 export async function updateProduct(productId: string, productData: UpdateProductData): Promise<void> {
      let imageUrl: string | undefined = undefined;
+
+     // Validate category/subCategory if they are part of the update
+     if (productData.category !== undefined) {
+        const validCategories = getMainCategories();
+        if (!validCategories.includes(productData.category as any)) {
+            throw new Error(`Invalid category provided for update: ${productData.category}`);
+        }
+         // If category is updated, subCategory MUST also be provided and valid for the NEW category
+         if (productData.subCategory !== undefined) {
+             const validSubCategories = getSubCategories(productData.category as any);
+             if (!validSubCategories.includes(productData.subCategory as any)) {
+                throw new Error(`Invalid subCategory "${productData.subCategory}" for updated category "${productData.category}"`);
+             }
+         } else {
+             // Fetch current product to check its subCategory if only category is changing
+             // This scenario might need more specific handling depending on requirements
+             // For now, we'll assume if category changes, subCategory should be specified
+             console.warn("Updating category without explicitly setting subCategory. Ensure the new subCategory is provided if needed.");
+             // Alternatively, throw an error:
+             // throw new Error("When updating category, a valid subCategory for the new category must also be provided.");
+         }
+     } else if (productData.subCategory !== undefined) {
+         // If only subCategory is updated, validate it against the *current* category
+         const currentProduct = await getProductById(productId);
+         if (!currentProduct) {
+             throw new Error(`Product with ID ${productId} not found for subCategory validation.`);
+         }
+         const validSubCategories = getSubCategories(currentProduct.category as any);
+         if (!validSubCategories.includes(productData.subCategory as any)) {
+             throw new Error(`Invalid subCategory "${productData.subCategory}" for current category "${currentProduct.category}"`);
+         }
+     }
+
 
     // Upload new image if provided
      if (productData.imageFile) {

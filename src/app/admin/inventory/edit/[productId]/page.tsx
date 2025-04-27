@@ -21,12 +21,15 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton
 import type { Product } from '@/types/product'; // Import Product type
 import Image from 'next/image'; // Import Image for current image display
+import { getMainCategories, getSubCategories, type Category } from '@/lib/categories'; // Import category helpers
 
 
-// Define Zod schema for validation (same as add, but image is optional)
+// Define Zod schema for validation including optional categories
 const productFormSchema = z.object({
   name: z.string().min(3, { message: "Product name must be at least 3 characters." }).optional(),
-  type: z.enum(['Beauty', 'Clothing']).optional(),
+  type: z.enum(['Beauty', 'Clothing']).optional(), // Keep if relevant
+  category: z.string().min(1, { message: "Please select a category." }).optional(), // Optional category
+  subCategory: z.string().min(1, { message: "Please select a sub-category." }).optional(), // Optional sub category
   description: z.string().min(10, { message: "Description must be at least 10 characters." }).optional(),
   price: z.coerce.number().min(0.01, { message: "Price must be a positive number." }).optional(),
   quantity: z.coerce.number().int().min(0, { message: "Quantity must be a non-negative integer." }).optional(),
@@ -36,6 +39,17 @@ const productFormSchema = z.object({
       file => !file || ["image/jpeg", "image/png", "image/webp"].includes(file.type),
       "Only .jpg, .png, and .webp formats are supported."
     ),
+})
+// Add refinement to ensure subCategory is valid for the chosen category if both are provided
+.refine(data => {
+    if (data.category && data.subCategory) {
+        const validSubCategories = getSubCategories(data.category as Category);
+        return validSubCategories.includes(data.subCategory);
+    }
+    return true; // Pass if category or subCategory is missing (handled by individual field validation)
+}, {
+    message: "Sub-category is not valid for the selected category.",
+    path: ["subCategory"], // Attach error to subCategory field
 });
 
 
@@ -51,6 +65,7 @@ export default function EditProductPage() {
   const [productData, setProductData] = useState<Product | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [availableSubCategories, setAvailableSubCategories] = useState<string[]>([]); // State for dynamic sub-categories
 
 
   const form = useForm<ProductFormValues>({
@@ -58,12 +73,33 @@ export default function EditProductPage() {
     defaultValues: { // Will be populated by fetched data
       name: '',
       type: undefined,
+      category: '',
+      subCategory: '',
       description: '',
       price: undefined,
       quantity: undefined,
       imageFile: null,
     },
   });
+
+  // Watch the 'category' field to update sub-categories dynamically
+  const selectedCategory = form.watch('category');
+
+  useEffect(() => {
+    if (selectedCategory) {
+      const subs = getSubCategories(selectedCategory as Category);
+      setAvailableSubCategories(subs);
+       // If the current subCategory is not valid for the new category, reset it
+       const currentSubCategory = form.getValues('subCategory');
+       if (currentSubCategory && !subs.includes(currentSubCategory)) {
+           form.setValue('subCategory', '', { shouldValidate: true });
+       }
+    } else {
+      setAvailableSubCategories([]);
+      form.setValue('subCategory', ''); // Clear subCategory if no category selected
+    }
+  }, [selectedCategory, form]);
+
 
   // Fetch existing product data using getProductById
   useEffect(() => {
@@ -85,12 +121,18 @@ export default function EditProductPage() {
            form.reset({
              name: currentProduct.name,
              type: currentProduct.type,
+             category: currentProduct.category, // Populate category
+             subCategory: currentProduct.subCategory, // Populate subCategory
              description: currentProduct.description,
              price: currentProduct.price,
              quantity: currentProduct.quantity,
              imageFile: null, // Reset file input
            });
             setPreviewUrl(currentProduct.imageUrl); // Set initial preview to current image
+             // Set initial sub-categories based on fetched category
+             if (currentProduct.category) {
+                setAvailableSubCategories(getSubCategories(currentProduct.category as Category));
+             }
          } else {
            setError(`Product with ID ${productId} not found.`);
          }
@@ -103,7 +145,8 @@ export default function EditProductPage() {
     }
 
     fetchProduct();
-  }, [productId, form]); // Re-run if productId or form changes
+  }, [productId, form]); // Re-run if productId changes
+
 
    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
      const file = event.target.files?.[0];
@@ -137,6 +180,8 @@ export default function EditProductPage() {
      // Compare with initial productData or defaultValues if needed, but simpler to just send all optional fields
      if (data.name !== undefined && data.name !== productData?.name) { dataToUpdate.name = data.name; hasChanges = true; }
      if (data.type !== undefined && data.type !== productData?.type) { dataToUpdate.type = data.type; hasChanges = true; }
+     if (data.category !== undefined && data.category !== productData?.category) { dataToUpdate.category = data.category; hasChanges = true; }
+     if (data.subCategory !== undefined && data.subCategory !== productData?.subCategory) { dataToUpdate.subCategory = data.subCategory; hasChanges = true; }
      if (data.description !== undefined && data.description !== productData?.description) { dataToUpdate.description = data.description; hasChanges = true; }
      if (data.price !== undefined && data.price !== productData?.price) { dataToUpdate.price = data.price; hasChanges = true; }
      if (data.quantity !== undefined && data.quantity !== productData?.quantity) { dataToUpdate.quantity = data.quantity; hasChanges = true; }
@@ -151,6 +196,15 @@ export default function EditProductPage() {
 
 
     try {
+      // Ensure subCategory is valid for the potentially updated category before sending
+       if (dataToUpdate.category && !dataToUpdate.subCategory) {
+          // If category changes but subCategory isn't explicitly set in the update,
+          // we might need to fetch the current subCategory or enforce setting it.
+          // For simplicity, the service layer now handles some validation, but UI could be stricter.
+          console.warn("Category updated, but subCategory was not explicitly provided in the update data.");
+          // We'll rely on the Zod refinement and the service validation for now.
+       }
+
       await updateProduct(productId, dataToUpdate);
       toast({
         title: "Product Updated",
@@ -196,10 +250,12 @@ export default function EditProductPage() {
         </CardHeader>
         <CardContent>
           {isLoadingProduct ? (
-             // Skeleton Form
+             // Skeleton Form including category fields
              <div className="space-y-6">
                 <Skeleton className="h-10 w-full" />
                 <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" /> {/* Category */}
+                <Skeleton className="h-10 w-full" /> {/* Sub-Category */}
                 <Skeleton className="h-20 w-full" />
                 <Skeleton className="h-10 w-1/2" />
                 <Skeleton className="h-10 w-1/2" />
@@ -230,7 +286,7 @@ export default function EditProductPage() {
                    name="type"
                    render={({ field }) => (
                      <FormItem>
-                       <FormLabel>Product Type</FormLabel>
+                       <FormLabel>Product Type (Broad)</FormLabel>
                        <Select onValueChange={field.onChange} value={field.value}> {/* Use value prop */}
                          <FormControl>
                            <SelectTrigger>
@@ -243,6 +299,58 @@ export default function EditProductPage() {
                          </SelectContent>
                        </Select>
                        <FormMessage />
+                     </FormItem>
+                   )}
+                 />
+
+                 {/* Main Category Dropdown */}
+                  <FormField
+                    control={form.control}
+                    name="category"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Category</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select main category" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {getMainCategories().map((cat) => (
+                              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                 {/* Sub-Category Dropdown (Dynamic) */}
+                 <FormField
+                   control={form.control}
+                   name="subCategory"
+                   render={({ field }) => (
+                     <FormItem>
+                       <FormLabel>Sub-Category</FormLabel>
+                       <Select
+                         onValueChange={field.onChange}
+                         value={field.value} // Ensure value is controlled
+                         disabled={!selectedCategory || availableSubCategories.length === 0}
+                       >
+                         <FormControl>
+                           <SelectTrigger>
+                             <SelectValue placeholder={selectedCategory ? "Select sub-category" : "Select category first"} />
+                           </SelectTrigger>
+                         </FormControl>
+                         <SelectContent>
+                           {availableSubCategories.map((subCat) => (
+                             <SelectItem key={subCat} value={subCat}>{subCat}</SelectItem>
+                           ))}
+                         </SelectContent>
+                       </Select>
+                       <FormMessage /> {/* This will show the refinement error too */}
                      </FormItem>
                    )}
                  />
@@ -327,7 +435,7 @@ export default function EditProductPage() {
                     )}
                   />
 
-                <Button type="submit" disabled={isSubmitting} className="w-full md:w-auto">
+                <Button type="submit" disabled={isSubmitting || !form.formState.isValid} className="w-full md:w-auto">
                   {isSubmitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />

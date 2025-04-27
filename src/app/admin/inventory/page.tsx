@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -100,7 +101,7 @@ export default function InventoryPage() {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl md:text-3xl font-bold">Inventory Management</h1>
          <Link href="/admin/inventory/add" passHref legacyBehavior>
-             <Button>
+             <Button suppressHydrationWarning>
                  <PlusCircle className="mr-2 h-4 w-4" /> Add Product
              </Button>
          </Link>
@@ -129,7 +130,9 @@ export default function InventoryPage() {
               <TableRow>
                 <TableHead className="w-[80px]">Image</TableHead>
                 <TableHead>Name</TableHead>
-                <TableHead>Type</TableHead>
+                {/* <TableHead>Type</TableHead> */}
+                <TableHead>Category</TableHead> {/* Added Category */}
+                <TableHead>Sub-Category</TableHead> {/* Added Sub-Category */}
                 <TableHead>Description</TableHead>
                 <TableHead className="text-right">Price (₹)</TableHead>
                 <TableHead className="text-right">Quantity</TableHead>
@@ -138,12 +141,13 @@ export default function InventoryPage() {
             </TableHeader>
             <TableBody>
               {loading ? (
-                 // Skeleton Loader Rows
+                 // Skeleton Loader Rows - Updated columns
                   Array.from({ length: 5 }).map((_, index) => (
                      <TableRow key={`skeleton-${index}`}>
                        <TableCell><Skeleton className="h-16 w-16 rounded-md" /></TableCell>
                        <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                       <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                       <TableCell><Skeleton className="h-4 w-24" /></TableCell> {/* Category */}
+                       <TableCell><Skeleton className="h-4 w-24" /></TableCell> {/* Sub-Category */}
                        <TableCell><Skeleton className="h-4 w-48" /></TableCell>
                        <TableCell className="text-right"><Skeleton className="h-4 w-12" /></TableCell>
                        <TableCell className="text-right"><Skeleton className="h-4 w-8" /></TableCell>
@@ -152,7 +156,8 @@ export default function InventoryPage() {
                   ))
               ) : !error && products.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center">
+                  {/* Updated colSpan */}
+                  <TableCell colSpan={8} className="h-24 text-center">
                     <PackageSearch className="mx-auto h-12 w-12 text-muted-foreground mb-2" />
                     No products found. Add your first product!
                   </TableCell>
@@ -170,14 +175,16 @@ export default function InventoryPage() {
                       />
                     </TableCell>
                     <TableCell className="font-medium">{product.name}</TableCell>
-                    <TableCell>{product.type}</TableCell>
+                    {/* <TableCell>{product.type}</TableCell> */}
+                    <TableCell>{product.category}</TableCell> {/* Display Category */}
+                    <TableCell>{product.subCategory}</TableCell> {/* Display Sub-Category */}
                     <TableCell className="max-w-xs truncate">{product.description}</TableCell>
                     <TableCell className="text-right">₹{product.price.toFixed(2)}</TableCell>
                     <TableCell className="text-right">{product.quantity ?? 'N/A'}</TableCell> {/* Handle potentially missing quantity */}
                     <TableCell className="text-center">
                       <div className="flex justify-center gap-2">
                         <Link href={`/admin/inventory/edit/${product.id}`} passHref legacyBehavior>
-                           <Button variant="outline" size="icon" className="h-8 w-8">
+                           <Button variant="outline" size="icon" className="h-8 w-8" suppressHydrationWarning>
                               <Edit className="h-4 w-4" />
                               <span className="sr-only">Edit</span>
                             </Button>
