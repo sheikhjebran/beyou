@@ -9,17 +9,17 @@ body {
 @layer base {
   :root {
     --background: 210 40% 98%; /* Soft off-white */
-    --foreground: 210 10% 23%; /* Dark muted gray */
+    --foreground: 0 0% 0%; /* Black text */
     --card: 0 0% 100%;
-    --card-foreground: 210 10% 23%;
+    --card-foreground: 0 0% 0%; /* Black text for card */
     --popover: 0 0% 100%;
-    --popover-foreground: 210 10% 23%;
+    --popover-foreground: 0 0% 0%; /* Black text for popover */
     --primary: 30 33% 95%; /* New Primary: #F6F1EE */
-    --primary-foreground: 210 10% 23%; /* Dark foreground for light primary */
+    --primary-foreground: 0 0% 0%; /* Black foreground for light primary */
     --secondary: 210 20% 91%; /* Light gray for secondary elements */
-    --secondary-foreground: 210 10% 23%;
+    --secondary-foreground: 0 0% 0%; /* Black text for secondary */
     --muted: 210 20% 91%;
-    --muted-foreground: 210 10% 45%;
+    --muted-foreground: 210 10% 45%; /* Muted gray for less important text */
     --accent: 180 100% 25.1%; /* Deep Teal */
     --accent-foreground: 0 0% 98%; /* White */
     --destructive: 0 84.2% 60.2%;
@@ -34,9 +34,9 @@ body {
     --chart-5: 180 20% 60%;
     --radius: 0.5rem;
     --sidebar-background: 210 40% 98%;
-    --sidebar-foreground: 210 10% 23%;
+    --sidebar-foreground: 0 0% 0%; /* Black text for sidebar */
     --sidebar-primary: 30 33% 95%; /* Adjusted sidebar primary */
-    --sidebar-primary-foreground: 210 10% 23%; /* Adjusted sidebar primary foreground */
+    --sidebar-primary-foreground: 0 0% 0%; /* Adjusted sidebar primary foreground */
     --sidebar-accent: 180 100% 25.1%;
     --sidebar-accent-foreground: 0 0% 98%;
     --sidebar-border: 210 20% 91%;
@@ -46,17 +46,17 @@ body {
     /* Keeping dark mode defaults for now, can be themed later if needed */
     /* Update dark mode primary if needed for consistency, or keep default dark teal */
     --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
+    --foreground: 0 0% 98%; /* White text */
     --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
+    --card-foreground: 0 0% 98%; /* White text for card */
     --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
+    --popover-foreground: 0 0% 98%; /* White text for popover */
     --primary: 30 33% 15%; /* Darker version of new primary */
     --primary-foreground: 0 0% 98%; /* Light foreground for dark primary */
     --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
+    --secondary-foreground: 0 0% 98%; /* White text for secondary */
     --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
+    --muted-foreground: 0 0% 63.9%; /* Lighter gray for muted text */
     --accent: 180 100% 35%; /* Adjusted Teal for dark */
     --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
@@ -70,7 +70,7 @@ body {
     --chart-4: 180 40% 60%;
     --chart-5: 180 20% 70%;
     --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-foreground: 240 4.8% 95.9%; /* White text for sidebar */
     --sidebar-primary: 30 33% 15%;
     --sidebar-primary-foreground: 0 0% 98%;
     --sidebar-accent: 240 3.7% 15.9%; /* Keep default dark accent */
