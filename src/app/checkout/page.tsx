@@ -28,18 +28,21 @@ export default function CheckoutPage() {
   const generateWhatsAppMessage = () => {
     let message = "Hi BeYou! I'd like to purchase the following items:\n\n";
     items.forEach(item => {
-      // Updated currency symbol to INR
+      // Updated currency symbol to INR and format
       message += `* ${item.product.name} (x${item.quantity}) - ₹${(item.product.price * item.quantity).toFixed(2)}\n`;
     });
-    // Updated currency symbol to INR
+    // Updated currency symbol to INR and format
     message += `\n*Total: ₹${totalPrice.toFixed(2)}*`;
+    // Encode the message for URL usage
     return encodeURIComponent(message);
   };
 
   const handleWhatsAppCheckout = () => {
      const message = generateWhatsAppMessage();
+     // Construct the WhatsApp URL using wa.me
      const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${message}`;
      console.log("Generated WhatsApp URL:", whatsappUrl); // Log the URL for debugging
+     // Open the URL in a new tab/window
      window.open(whatsappUrl, '_blank', 'noopener,noreferrer'); // Added noopener,noreferrer for security
      // Optionally clear cart after sending to WhatsApp
      // clearCart();
@@ -83,7 +86,7 @@ export default function CheckoutPage() {
                     <TableRow key={item.product.id}>
                       <TableCell>
                         <Image
-                          src={item.product.imageUrl}
+                          src={item.product.imageUrl || 'https://picsum.photos/seed/productimg/64/64'} // Add fallback image
                           alt={item.product.name}
                           width={64}
                           height={64}
