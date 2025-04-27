@@ -13,7 +13,7 @@ import Link from 'next/link';
 import { Header } from '@/components/header'; // Import Header
 
 export default function LoginPage() {
-  const [username, setUsername] = useState('');
+  const [loginCode, setLoginCode] = useState(''); // Changed state variable name
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
@@ -22,12 +22,12 @@ export default function LoginPage() {
     setError(null); // Clear previous errors
 
     // Basic Authentication Check (Insecure - for MVP only)
-    if (username === 'ayesha') {
+    if (loginCode === 'ayesha') { // Check against the login code
       // In a real app, you'd set a session/token here
       console.log('Admin Login Successful'); // Placeholder
       router.push('/admin'); // Redirect to a future admin dashboard
     } else {
-      setError('Invalid username. Please try again.');
+      setError('Invalid login code. Please try again.'); // Updated error message
     }
   };
 
@@ -38,7 +38,7 @@ export default function LoginPage() {
           <Card className="w-full max-w-md shadow-xl">
             <CardHeader className="text-center">
               <CardTitle className="text-2xl font-bold text-primary">Admin Login</CardTitle>
-              <CardDescription>Enter your username to access the admin area.</CardDescription>
+              <CardDescription>Enter your code to access the admin area.</CardDescription> {/* Updated description */}
             </CardHeader>
             <CardContent>
               {error && (
@@ -50,21 +50,20 @@ export default function LoginPage() {
               )}
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="username">Username</Label>
+                  <Label htmlFor="loginCode">Admin Login code</Label> {/* Changed label text and htmlFor */}
                   <Input
-                    id="username"
-                    type="text"
-                    placeholder="Enter username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    id="loginCode" // Changed input id
+                    type="password" // Changed input type to password
+                    placeholder="enter password" // Changed placeholder text
+                    value={loginCode}
+                    onChange={(e) => setLoginCode(e.target.value)}
                     required
                     aria-describedby={error ? "error-message" : undefined}
                     aria-invalid={!!error}
                   />
                   {error && <p id="error-message" className="text-sm text-destructive">{error}</p>}
                 </div>
-                {/* Password field removed as per requirement */}
-                <Button type="submit" className="w-full">
+                <Button type="submit" className="w-full" suppressHydrationWarning>
                   Login
                 </Button>
               </form>
@@ -83,3 +82,4 @@ export default function LoginPage() {
     </div>
   );
 }
+
