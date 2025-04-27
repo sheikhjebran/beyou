@@ -40,10 +40,15 @@ export default function Home() {
 
 
   // Filter products based on search term and fetched data
-  const filteredProducts = products.filter((product: Product) =>
-    (product.name?.toLowerCase() ?? '').includes(searchTerm.toLowerCase()) ||
-    (product.description?.toLowerCase() ?? '').includes(searchTerm.toLowerCase())
-  );
+  const filteredProducts = products.filter((product: Product) => {
+    const term = searchTerm.trim().toLowerCase(); // Trim whitespace and convert to lower case
+    if (!term) return true; // If search term is empty after trimming, show all products
+
+    const nameMatch = (product.name?.toLowerCase() ?? '').includes(term);
+    const descriptionMatch = (product.description?.toLowerCase() ?? '').includes(term);
+    return nameMatch || descriptionMatch;
+  });
+
 
   return (
     <div className="flex min-h-screen flex-col">
