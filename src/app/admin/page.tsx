@@ -1,6 +1,6 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { LayoutDashboard, Package, PackageX, BarChart3, List, Clock } from 'lucide-react';
+import { LayoutDashboard, Package, PackageX, BarChart3, List, Clock, CalendarDays } from 'lucide-react'; // Added CalendarDays
 import { getProducts } from '@/services/productService';
 import type { Product } from '@/types/product';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -15,6 +15,7 @@ async function getDashboardData() {
     const totalProducts = products.length;
     const zeroQuantityProducts = products.filter(p => p.quantity === 0);
     // Placeholder for recent product - ideally sort by createdAt if available
+    // This still requires a timestamp field in the product data for accurate sorting
     const recentProduct = products.length > 0 ? products[0] : null;
     return {
       products,
@@ -37,6 +38,7 @@ async function getDashboardData() {
 
 export default async function AdminDashboardPage() {
   const { totalProducts, zeroQuantityProducts, recentProduct, error } = await getDashboardData();
+  const todayDate = new Date().toLocaleDateString(); // Get today's date
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
@@ -107,36 +109,42 @@ export default async function AdminDashboardPage() {
               <>
                 <div className="text-base font-semibold truncate">{recentProduct.name}</div>
                 <p className="text-xs text-muted-foreground">
-                    ID: {recentProduct.id.substring(0, 8)}... (Note: This shows the first fetched, not necessarily latest added)
+                    ID: {recentProduct.id.substring(0, 8)}... (Note: Needs timestamp for accuracy)
                 </p>
              </>
             ) : (
               <div className="text-base font-semibold">N/A</div>
             )}
-             <p className="text-xs text-muted-foreground mt-1">Timestamp needed for accurate sorting</p>
+             <p className="text-xs text-muted-foreground mt-1">Requires product creation timestamp</p>
           </CardContent>
         </Card>
 
-        {/* Orders Today Card (Placeholder) */}
+        {/* Orders Today Card */}
         <Card className="shadow-md hover:shadow-lg transition-shadow bg-secondary/30">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Orders Today</CardTitle>
+            <CardTitle className="text-sm font-medium flex items-center gap-1">
+               Orders Today <span className="text-xs font-normal">({todayDate})</span>
+            </CardTitle>
              <List className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">[Data Placeholder]</div>
+             {/* Replace placeholder with 0 */}
+            <div className="text-2xl font-bold">0</div>
             <p className="text-xs text-muted-foreground">Requires order tracking system</p>
           </CardContent>
         </Card>
 
-        {/* Sales Today Card (Placeholder) */}
+        {/* Sales Today Card */}
         <Card className="shadow-md hover:shadow-lg transition-shadow bg-secondary/30">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Sales Today (₹)</CardTitle>
+             <CardTitle className="text-sm font-medium flex items-center gap-1">
+               Sales Today (₹) <span className="text-xs font-normal">({todayDate})</span>
+            </CardTitle>
             <span className="h-4 w-4 text-muted-foreground font-bold">₹</span>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">[Data Placeholder]</div>
+             {/* Replace placeholder with 0 */}
+            <div className="text-2xl font-bold">0.00</div>
             <p className="text-xs text-muted-foreground">Requires sales data integration</p>
           </CardContent>
         </Card>
