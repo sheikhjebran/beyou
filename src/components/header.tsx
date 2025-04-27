@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'; // Import Input
 import { LogIn, ShoppingCart, Search } from 'lucide-react'; // Import Search icon
 import { useCart } from '@/hooks/use-cart'; // Import the useCart hook
 import { Badge } from '@/components/ui/badge'; // Import Badge
-import { useState } from 'react'; // Import useState
+import { useState, useEffect } from 'react'; // Import useState and useEffect
 
 // Define props for the Header component
 interface HeaderProps {
@@ -18,6 +18,13 @@ export function Header({ onSearchChange }: HeaderProps) {
   const { getTotalItems } = useCart(); // Get cart functions
   const totalItems = getTotalItems();
   const [localSearchTerm, setLocalSearchTerm] = useState('');
+  const [isClientMounted, setIsClientMounted] = useState(false); // State to track client mount
+
+  // Set isClientMounted to true only after the component mounts on the client
+  useEffect(() => {
+    setIsClientMounted(true);
+  }, []);
+
 
   const handleSearchInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const term = event.target.value;
@@ -69,7 +76,8 @@ export function Header({ onSearchChange }: HeaderProps) {
            <Link href="/checkout" legacyBehavior passHref>
              <Button variant="ghost" size="icon" aria-label="Shopping Cart" className="relative">
                <ShoppingCart className="h-5 w-5" />
-               {totalItems > 0 && (
+               {/* Only render badge on client after mount to prevent hydration mismatch */}
+               {isClientMounted && totalItems > 0 && (
                  <Badge
                     variant="destructive" // Use destructive for visibility, or primary/secondary
                     className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center rounded-full text-xs"

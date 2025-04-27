@@ -18,7 +18,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} font-sans antialiased`} suppressHydrationWarning={true}>
+      {/* Removed suppressHydrationWarning from body, keep it on html if needed for theme switching etc. */}
+      <body className={`${inter.variable} font-sans antialiased`}>
         <CartProvider>
           {children}
           <Toaster />
