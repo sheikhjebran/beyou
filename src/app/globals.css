@@ -14,8 +14,8 @@ body {
     --card-foreground: 0 0% 0%; /* Black text for card */
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 0%; /* Black text for popover */
-    --primary: 30 33% 95%; /* New Primary: #F6F1EE */
-    --primary-foreground: 0 0% 0%; /* Black foreground for light primary */
+    --primary: 35 100% 60%; /* Light Orange */
+    --primary-foreground: 0 0% 0%; /* Black foreground for light orange primary */
     --secondary: 210 20% 91%; /* Light gray for secondary elements */
     --secondary-foreground: 0 0% 0%; /* Black text for secondary */
     --muted: 210 20% 91%;
@@ -26,8 +26,8 @@ body {
     --destructive-foreground: 0 0% 98%;
     --border: 210 20% 91%; /* Light gray border */
     --input: 210 20% 91%;
-    --ring: 30 33% 95%; /* New Ring color based on primary */
-    --chart-1: 30 33% 90%; /* Adjusted chart color based on primary */
+    --ring: 35 100% 60%; /* Ring color based on new light orange primary */
+    --chart-1: 35 90% 70%; /* Adjusted chart color based on new primary */
     --chart-2: 180 80% 30%;
     --chart-3: 180 60% 40%;
     --chart-4: 180 40% 50%;
@@ -35,24 +35,22 @@ body {
     --radius: 0.5rem;
     --sidebar-background: 210 40% 98%;
     --sidebar-foreground: 0 0% 0%; /* Black text for sidebar */
-    --sidebar-primary: 30 33% 95%; /* Adjusted sidebar primary */
+    --sidebar-primary: 35 100% 60%; /* Adjusted sidebar primary */
     --sidebar-primary-foreground: 0 0% 0%; /* Adjusted sidebar primary foreground */
     --sidebar-accent: 180 100% 25.1%;
     --sidebar-accent-foreground: 0 0% 98%;
     --sidebar-border: 210 20% 91%;
-    --sidebar-ring: 30 33% 95%; /* Adjusted sidebar ring */
+    --sidebar-ring: 35 100% 60%; /* Adjusted sidebar ring */
   }
   .dark {
-    /* Keeping dark mode defaults for now, can be themed later if needed */
-    /* Update dark mode primary if needed for consistency, or keep default dark teal */
     --background: 0 0% 3.9%;
     --foreground: 0 0% 98%; /* White text */
     --card: 0 0% 3.9%;
     --card-foreground: 0 0% 98%; /* White text for card */
     --popover: 0 0% 3.9%;
     --popover-foreground: 0 0% 98%; /* White text for popover */
-    --primary: 30 33% 15%; /* Darker version of new primary */
-    --primary-foreground: 0 0% 98%; /* Light foreground for dark primary */
+    --primary: 35 100% 30%; /* Darker Orange for dark mode */
+    --primary-foreground: 0 0% 98%; /* Light foreground for dark orange primary */
     --secondary: 0 0% 14.9%;
     --secondary-foreground: 0 0% 98%; /* White text for secondary */
     --muted: 0 0% 14.9%;
@@ -63,20 +61,20 @@ body {
     --destructive-foreground: 0 0% 98%;
     --border: 0 0% 14.9%;
     --input: 0 0% 14.9%;
-    --ring: 30 33% 15%; /* Darker ring */
-    --chart-1: 30 33% 20%;
+    --ring: 35 100% 30%; /* Darker ring for dark mode */
+    --chart-1: 35 90% 40%; /* Darker chart color */
     --chart-2: 180 80% 40%;
     --chart-3: 180 60% 50%;
     --chart-4: 180 40% 60%;
     --chart-5: 180 20% 70%;
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%; /* White text for sidebar */
-    --sidebar-primary: 30 33% 15%;
-    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-primary: 35 100% 30%; /* Adjusted dark sidebar primary */
+    --sidebar-primary-foreground: 0 0% 98%; /* Adjusted dark sidebar primary foreground */
     --sidebar-accent: 240 3.7% 15.9%; /* Keep default dark accent */
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 30 33% 15%;
+    --sidebar-ring: 35 100% 30%; /* Adjusted dark sidebar ring */
   }
 }
 
