@@ -48,7 +48,7 @@ export default function ContactPage() {
                  <div className="flex items-start space-x-3">
                    <MapPin className="h-5 w-5 text-accent mt-1 shrink-0" />
                    <p className="text-foreground">
-                     Vijaynagar,
+                     Commercial Street,
                      <br />
                      Bangalore, Karnataka
                      <br />
@@ -57,7 +57,7 @@ export default function ContactPage() {
                  </div>
                   {/* Placeholder for map */}
                   <div className="mt-4 h-48 bg-muted rounded-md flex items-center justify-center text-muted-foreground">
-                    Map Placeholder (Vijaynagar, Bangalore)
+                    Map Placeholder (Commercial Street, Bangalore)
                  </div>
                </CardContent>
              </Card>
@@ -70,3 +70,4 @@ export default function ContactPage() {
     </div>
   );
 }
+
