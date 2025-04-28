@@ -8,7 +8,7 @@ import { LogIn, ShoppingCart, Search, Menu, ChevronDown } from 'lucide-react'; /
 import { useCart } from '@/hooks/use-cart'; // Import the useCart hook
 import { Badge } from '@/components/ui/badge'; // Import Badge
 import { useState, useEffect } from 'react'; // Import useState and useEffect
-import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet"; // Import Sheet components
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from "@/components/ui/sheet"; // Import Sheet components, including SheetHeader and SheetTitle
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -91,6 +91,10 @@ export function Header({ onSearchChange }: HeaderProps) {
                </Button>
              </SheetTrigger>
              <SheetContent side="left" className="w-full max-w-xs sm:max-w-sm">
+               {/* Add SheetHeader and visually hidden SheetTitle for accessibility */}
+               <SheetHeader className="sr-only">
+                  <SheetTitle>Main Navigation Menu</SheetTitle>
+                </SheetHeader>
                <nav className="flex flex-col space-y-4 p-4">
                  {/* Use mobile specific links */}
                  {mobileNavLinks.map((link) => (
