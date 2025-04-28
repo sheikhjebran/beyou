@@ -21,8 +21,8 @@ export default function ContactPage() {
                 <div className="flex items-center space-x-3">
                   <Mail className="h-5 w-5 text-accent" />
                   {/* Updated email */}
-                  <a href="mailto:sheikhjebran@gmail.com" className="text-foreground hover:text-primary transition-colors">
-                    sheikhjebran@gmail.com
+                  <a href="mailto:be.you1914@gmail.com" className="text-foreground hover:text-primary transition-colors">
+                    be.you1914@gmail.com
                   </a>
                 </div>
                 <div className="flex items-center space-x-3">
