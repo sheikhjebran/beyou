@@ -28,8 +28,8 @@ export default function ContactPage() {
                 <div className="flex items-center space-x-3">
                   <Phone className="h-5 w-5 text-accent" />
                   {/* Updated phone number */}
-                  <a href="tel:+919945662602" className="text-foreground hover:text-primary transition-colors">
-                    +91 9945662602
+                  <a href="tel:+918217714675" className="text-foreground hover:text-primary transition-colors">
+                    +91 8217714675
                   </a>
                 </div>
                 {/* Placeholder for contact form or more info */}
