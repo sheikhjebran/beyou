@@ -48,16 +48,20 @@ export default function ContactPage() {
                  <div className="flex items-start space-x-3">
                    <MapPin className="h-5 w-5 text-accent mt-1 shrink-0" />
                    <p className="text-foreground">
-                     Commercial Street,
+                     Aiza collections
                      <br />
-                     Bangalore, Karnataka
+                     298, Veera Pillai St, near Commercial Street,
+                     <br />
+                     Tasker Town, Shivaji Nagar,
+                     <br />
+                     Bengaluru, Karnataka 560001
                      <br />
                      India
                    </p>
                  </div>
                   {/* Placeholder for map */}
                   <div className="mt-4 h-48 bg-muted rounded-md flex items-center justify-center text-muted-foreground">
-                    Map Placeholder (Commercial Street, Bangalore)
+                    Map Placeholder (Aiza Collections, Shivaji Nagar)
                  </div>
                </CardContent>
              </Card>
