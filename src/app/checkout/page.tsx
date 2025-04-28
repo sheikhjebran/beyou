@@ -11,7 +11,7 @@ import Link from 'next/link';
 import { Header } from '@/components/header'; // Import Header
 import { Separator } from '@/components/ui/separator'; // Import Separator
 
-const WHATSAPP_NUMBER = "919945662602"; // Include country code (e.g., 91 for India)
+const WHATSAPP_NUMBER = "918217714675"; // Update WhatsApp number (Include country code)
 
 export default function CheckoutPage() {
   const { items, getTotalPrice, updateQuantity, removeFromCart, clearCart } = useCart();
