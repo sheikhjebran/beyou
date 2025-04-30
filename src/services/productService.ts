@@ -170,7 +170,7 @@ export async function getMostRecentProduct(): Promise<Product | null> {
                  // Provide clearer guidance to create the index
                  const indexCreationMessage = `
 ##############################################################################
-# ACTION REQUIRED: Firestore Index Missing                                   #
+# ACTION REQUIRED: Firestore Index Missing for Recent Products Query         #
 ##############################################################################
 #
 # The query to fetch the most recent product requires a Firestore index.
@@ -181,27 +181,29 @@ export async function getMostRecentProduct(): Promise<Product | null> {
 # 2. createdAt (Descending)
 #
 # You can often create this index directly using the link provided in the
-# original Firebase error message (check your server logs or browser console).
+# full Firebase error message (check your server logs or browser console).
 #
-# Example Error Link from Firebase:
-# ${error.message.match(/https?:\/\/[^\s]+/)?.[0] || 'See Firebase Console logs for the creation link.'}
+# Example Link from Firebase Error (might be present in logs):
+# ${error.message.match(/https?:\/\/[^\s]+/) ? error.message.match(/https?:\/\/[^\s]+/)?.[0] : 'See Firebase Console logs for the creation link.'}
 #
 # Once the index is built (this may take a few minutes), this feature
 # should work correctly. The application will show 'N/A' until then.
 #
+# Original Error: ${error.message}
+#
 ##############################################################################
 `;
-                 console.error(indexCreationMessage);
+                 console.error(indexCreationMessage); // Log the detailed instructions
                  // Return null to allow the rest of the dashboard to load gracefully
                  return null; // Return null here
              } else {
-                 console.error(`Failed to fetch recent product due to Firestore error: ${error.message}`);
-                 // Return null for other Firestore errors too, to maintain dashboard resilience
+                 // Log other Firestore errors but still return null for resilience
+                 console.error(`Failed to fetch recent product due to Firestore error: ${error.message}. Returning null.`);
                  return null; // Return null here
              }
         }
         // Fallback for generic errors - also return null for dashboard resilience
-        console.error(`Failed to fetch recent product. Original error: ${error instanceof Error ? error.message : String(error)}`);
+        console.error(`Failed to fetch recent product. Original error: ${error instanceof Error ? error.message : String(error)}. Returning null.`);
         return null; // Return null here
     }
 }
@@ -461,3 +463,4 @@ export async function updateProduct(productId: string, productData: UpdateProduc
 //         throw new Error("Failed to delete product.");
 //     }
 // }
+
