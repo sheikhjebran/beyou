@@ -1,3 +1,4 @@
+
 // Import the functions you need from the SDKs you need
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAnalytics, isSupported } from "firebase/analytics";
@@ -13,13 +14,13 @@ import { getStorage } from "firebase/storage"; // Import Storage
 // (e.g., .env.local) and access them via process.env.NEXT_PUBLIC_FIREBASE_*,
 // never hardcode them directly in the source code.
 const firebaseConfig = {
-  apiKey: "AIzaSyAZN31awa29P4MS5uFN2sMZ7G9B1DsYTZw",
-  authDomain: "beyou-a4723.firebaseapp.com",
-  projectId: "beyou-a4723",
-  storageBucket: "beyou-a4723.appspot.com", // Corrected storage bucket domain
-  messagingSenderId: "70655659032",
-  appId: "1:70655659032:web:68c808f7c2b2b1ee59876d",
-  measurementId: "G-7E3HPMN496"
+    apiKey: "AIzaSyBIcJ6DXZlvbBDey7CuIQmDSTJrgRL01Qg",
+    authDomain: "beyou-f9842.firebaseapp.com",
+    projectId: "beyou-f9842",
+    storageBucket: "beyou-f9842.appspot.com", // Keep the .appspot.com for storage bucket reference
+    messagingSenderId: "905906146458",
+    appId: "1:905906146458:web:7949f115a605ba793b6323",
+    measurementId: "G-JWNJ9W854M"
 };
 
 
