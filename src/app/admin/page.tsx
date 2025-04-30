@@ -17,13 +17,14 @@ async function getDashboardData() {
     const zeroQuantityProducts = products.filter(p => p.quantity === 0);
 
     // Fetch the single most recent product separately
+    // This function already returns serialized timestamps
     const recentProduct = await getMostRecentProduct();
 
     return {
-      products, // Keep this if needed elsewhere, though not strictly necessary for the cards shown
+      products, // Keep this if needed elsewhere
       totalProducts,
       zeroQuantityProducts,
-      recentProduct, // This is now the actual most recent product
+      recentProduct, // This object contains serializable timestamps
       error: null,
     };
   } catch (error) {
@@ -47,6 +48,24 @@ export default async function AdminDashboardPage() {
       month: '2-digit',
       year: 'numeric'
     });
+
+   // Function to format the timestamp for display
+   const formatTimestamp = (isoString: string | null | undefined): string => {
+     if (!isoString) return 'N/A';
+     try {
+        const date = new Date(isoString);
+        return date.toLocaleString('en-IN', { // Use locale for better readability
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+         });
+     } catch {
+        return 'Invalid Date';
+     }
+   };
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
@@ -119,10 +138,16 @@ export default async function AdminDashboardPage() {
                 <p className="text-xs text-muted-foreground">
                     ID: {recentProduct.id.substring(0, 8)}...
                 </p>
-                 {/* Display timestamp if available and needed */}
-                 {/* <p className="text-xs text-muted-foreground mt-1">
-                   Updated: {recentProduct.updatedAt ? new Date(recentProduct.updatedAt).toLocaleString() : 'N/A'}
-                 </p> */}
+                 {/* Display formatted timestamp */}
+                 <p className="text-xs text-muted-foreground mt-1">
+                    Updated: {formatTimestamp(recentProduct.updatedAt)}
+                 </p>
+                 {/* Optionally display createdAt if different */}
+                 {/* {recentProduct.createdAt !== recentProduct.updatedAt && (
+                    <p className="text-xs text-muted-foreground">
+                        Created: {formatTimestamp(recentProduct.createdAt)}
+                    </p>
+                 )} */}
              </>
             ) : !error ? ( // Only show N/A if there wasn't a loading error
               <div className="text-base font-semibold">N/A</div>

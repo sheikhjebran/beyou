@@ -148,8 +148,8 @@ export async function getMostRecentProduct(): Promise<Product | null> {
             imageUrl: data.imageUrl || DEFAULT_IMAGE_URL,
             quantity: data.quantity,
             // Include serialized timestamps if needed for display, otherwise omit
-            // createdAt: serializeTimestamp(data.createdAt),
-            // updatedAt: serializeTimestamp(data.updatedAt),
+            createdAt: serializeTimestamp(data.createdAt), // Include serializable timestamp
+            updatedAt: serializeTimestamp(data.updatedAt), // Include serializable timestamp
         };
 
         console.log("Successfully fetched the most recent product:", recentProduct.id);
@@ -161,11 +161,10 @@ export async function getMostRecentProduct(): Promise<Product | null> {
             console.error(`Firestore Error Code: ${error.code}`);
              if (error.code === 'permission-denied') {
                  console.error("Permission denied when fetching recent product. Check Firestore security rules.");
-                 // Return null for dashboard resilience
-                 return null;
+                 return null; // Return null for dashboard resilience
              } else if (error.code === 'unauthenticated') {
                  console.error("User is unauthenticated. Cannot fetch recent product.");
-                 return null;
+                 return null; // Return null here
              } else if (error.code === 'failed-precondition' && error.message.includes('index')) {
                  // Provide clearer guidance to create the index
                  const indexCreationMessage = `
@@ -203,7 +202,7 @@ export async function getMostRecentProduct(): Promise<Product | null> {
              }
         }
         // Fallback for generic errors - also return null for dashboard resilience
-        console.error(`Failed to fetch recent product. Original error: ${error instanceof Error ? error.message : String(error)}. Returning null.`);
+        console.error(`Failed to fetch recent product. Original error: ${error instanceof Error ? error.message : String(error)}`);
         return null; // Return null here
     }
 }
@@ -236,7 +235,8 @@ export async function getProductById(productId: string): Promise<Product | null>
       price: data.price,
       imageUrl: data.imageUrl || DEFAULT_IMAGE_URL,
       quantity: data.quantity,
-      // Timestamps are NOT included here
+      createdAt: serializeTimestamp(data.createdAt), // Include serializable timestamp
+      updatedAt: serializeTimestamp(data.updatedAt), // Include serializable timestamp
     };
 
     console.log(`Successfully fetched product: ${productId}`);
