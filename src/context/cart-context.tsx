@@ -1,7 +1,8 @@
+
 "use client";
 
 import type { Product } from '@/types/product';
-import React, { createContext, useState, ReactNode, useEffect } from 'react';
+import React, { createContext, ReactNode, useEffect } from 'react'; // Removed useState from destructuring
 
 export type CartItem = {
   product: Product;
@@ -37,8 +38,9 @@ type CartProviderProps = {
 const CART_STORAGE_KEY = 'beyou_cart';
 
 export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [isInitialized, setIsInitialized] = useState(false);
+  // Use React.useState explicitly
+  const [cartItems, setCartItems] = React.useState<CartItem[]>([]);
+  const [isInitialized, setIsInitialized] = React.useState(false);
 
   // Load cart from localStorage on initial mount
   useEffect(() => {
@@ -132,3 +134,4 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     </CartContext.Provider>
   );
 };
+
