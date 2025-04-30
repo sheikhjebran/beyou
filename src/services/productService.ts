@@ -108,6 +108,7 @@ export async function getProducts(): Promise<Product[]> {
  * Fetches the most recently added or updated product from Firestore.
  * Uses the 'updatedAt' timestamp primarily, falling back to 'createdAt'.
  * Requires a composite index: products(updatedAt DESC, createdAt DESC).
+ * Handles cases where the index is still building.
  * @returns Promise<Product | null> The most recent product or null if none exist or on error.
  */
 export async function getMostRecentProduct(): Promise<Product | null> {
@@ -166,33 +167,36 @@ export async function getMostRecentProduct(): Promise<Product | null> {
                  console.error("User is unauthenticated. Cannot fetch recent product.");
                  return null; // Return null here
              } else if (error.code === 'failed-precondition' && error.message.includes('index')) {
-                 // Provide clearer guidance to create the index
-                 const indexCreationMessage = `
+                 // Check if the error message indicates the index is building
+                 const isBuilding = error.message.includes('currently building');
+                 const indexInfoMessage = `
 ##############################################################################
-# ACTION REQUIRED: Firestore Index Missing for Recent Products Query         #
+# ACTION REQUIRED / INFO: Firestore Index Issue for Recent Products Query    #
 ##############################################################################
 #
-# The query to fetch the most recent product requires a Firestore index.
-# Please create this index in your Firebase Console for the 'products' collection.
-#
-# Required Index Fields:
+# The query to fetch the most recent product requires a Firestore index
+# for the 'products' collection with fields:
 # 1. updatedAt (Descending)
 # 2. createdAt (Descending)
 #
-# You can often create this index directly using the link provided in the
-# full Firebase error message (check your server logs or browser console).
+# Status: ${isBuilding ? 'INDEX IS CURRENTLY BUILDING' : 'INDEX MISSING OR MISCONFIGURED'}
 #
-# Example Link from Firebase Error (might be present in logs):
-# ${error.message.match(/https?:\/\/[^\s]+/) ? error.message.match(/https?:\/\/[^\s]+/)?.[0] : 'See Firebase Console logs for the creation link.'}
+${isBuilding
+? '# The required index is still being created by Firebase. This is temporary.'
+: '# Please create this index in your Firebase Console.'}
+# The application will show 'N/A' for the recent product until the index is ready.
 #
-# Once the index is built (this may take a few minutes), this feature
-# should work correctly. The application will show 'N/A' until then.
+# You can often create/check the index using the link provided in the
+# full Firebase error message below or in your Firebase Console.
+#
+# Link from error (if available):
+# ${error.message.match(/https?:\/\/[^\s]+/) ? error.message.match(/https?:\/\/[^\s]+/)?.[0] : 'See Firebase Console logs.'}
 #
 # Original Error: ${error.message}
 #
 ##############################################################################
 `;
-                 console.error(indexCreationMessage); // Log the detailed instructions
+                 console.warn(indexInfoMessage); // Use warn for building, error if missing might be better
                  // Return null to allow the rest of the dashboard to load gracefully
                  return null; // Return null here
              } else {
