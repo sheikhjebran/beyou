@@ -1,4 +1,5 @@
 
+
 'use server'; // Required for server-side actions
 
 import { db, storage } from '@/lib/firebase';
@@ -158,7 +159,7 @@ export async function getMostRecentProduct(): Promise<Product | null> {
         console.error("Error fetching the most recent product: ", error);
         if (error instanceof FirestoreError) {
             console.error(`Firestore Error Code: ${error.code}`);
-            if (error.code === 'permission-denied') {
+             if (error.code === 'permission-denied') {
                  console.error("Permission denied when fetching recent product. Check Firestore security rules.");
                  // Return null for dashboard resilience
                  return null;
@@ -192,15 +193,16 @@ export async function getMostRecentProduct(): Promise<Product | null> {
 `;
                  console.error(indexCreationMessage);
                  // Return null to allow the rest of the dashboard to load gracefully
-                 return null;
+                 return null; // Return null here
              } else {
                  console.error(`Failed to fetch recent product due to Firestore error: ${error.message}`);
-                 return null;
+                 // Return null for other Firestore errors too, to maintain dashboard resilience
+                 return null; // Return null here
              }
         }
         // Fallback for generic errors - also return null for dashboard resilience
         console.error(`Failed to fetch recent product. Original error: ${error instanceof Error ? error.message : String(error)}`);
-        return null;
+        return null; // Return null here
     }
 }
 
@@ -459,4 +461,3 @@ export async function updateProduct(productId: string, productData: UpdateProduc
 //         throw new Error("Failed to delete product.");
 //     }
 // }
-
