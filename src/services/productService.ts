@@ -44,13 +44,14 @@ const serializeTimestamp = (timestamp: unknown): string | null => {
  * Fetches all products from the Firestore 'products' collection.
  * Returns only serializable fields suitable for client components.
  * Products are sorted by name by default.
+ * Requires a composite index: products(name ASC).
  * @returns Promise<Product[]> An array of products.
  */
 export async function getProducts(): Promise<Product[]> {
     try {
         console.log("Attempting to fetch products from Firestore...");
         const productsCollection = collection(db, 'products');
-        // Optional: Add sorting if needed for the main list, e.g., orderBy('name', 'asc')
+        // Ensure the index exists: Collection: products, Fields: name ASC
         const q = query(productsCollection, orderBy('name', 'asc'));
         const productSnapshot = await getDocs(q); // Use the query 'q' here
 
@@ -81,7 +82,6 @@ export async function getProducts(): Promise<Product[]> {
         console.error("Error fetching products from Firestore: ", error);
         // Provide more specific feedback based on the error type if possible
         if (error instanceof FirestoreError) {
-            // Common Firestore errors: 'permission-denied', 'unavailable', 'unauthenticated', 'failed-precondition'
             console.error(`Firestore Error Code: ${error.code}`);
              if (error.code === 'permission-denied') {
                  throw new Error("Permission denied when fetching products. Check Firestore security rules.");
@@ -91,7 +91,7 @@ export async function getProducts(): Promise<Product[]> {
                 throw new Error("Firestore is currently unavailable. Please try again later.");
              } else if (error.code === 'failed-precondition' && error.message.includes('index')) {
                  // Suggest creating the index
-                 const indexCreationMessage = `Firestore index required for sorting/filtering products. Please create the necessary index in your Firebase console. Error: ${error.message}`;
+                 const indexCreationMessage = `Firestore index required for sorting/filtering products. Please create the necessary index in your Firebase console (e.g., for sorting by 'name'). Error: ${error.message}`;
                  console.error(indexCreationMessage);
                  throw new Error("Database index required for sorting/filtering. Please check server logs or Firebase console to create the required index.");
              }
@@ -459,5 +459,4 @@ export async function updateProduct(productId: string, productData: UpdateProduc
 //         throw new Error("Failed to delete product.");
 //     }
 // }
-
 
