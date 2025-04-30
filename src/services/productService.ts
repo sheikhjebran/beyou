@@ -5,7 +5,7 @@ import { db, storage } from '@/lib/firebase';
 import { collection, getDocs, addDoc, doc, updateDoc, serverTimestamp, FirestoreError, query, orderBy, limit, Timestamp, getDoc } from 'firebase/firestore'; // Import FirestoreError, query, orderBy, limit, Timestamp, getDoc
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { Product } from '@/types/product';
-import { getMainCategories, getSubCategories } from '@/lib/categories'; // Import category helpers
+import { getMainCategories, getSubCategories, type Category } from '@/lib/categories'; // Import category helpers
 
 // Default placeholder image URL
 const DEFAULT_IMAGE_URL = 'https://picsum.photos/seed/productplaceholder/400/300';
@@ -182,7 +182,7 @@ export async function getMostRecentProduct(): Promise<Product | null> {
 # You can often create this index directly using the link provided in the
 # original Firebase error message (check your server logs or browser console).
 #
-# Example Error Link:
+# Example Error Link from Firebase:
 # ${error.message.match(/https?:\/\/[^\s]+/)?.[0] || 'See Firebase Console logs for the creation link.'}
 #
 # Once the index is built (this may take a few minutes), this feature
