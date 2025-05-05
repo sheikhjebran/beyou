@@ -23,8 +23,10 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"; // Import Dropdown components
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"; // Import Accordion
 import { getMainCategories, getSubCategories } from '@/lib/categories'; // Import categories
 import Image from 'next/image'; // Import Image
+import { Separator } from '@/components/ui/separator'; // Import Separator
 
 // Define props for the Header component
 interface HeaderProps {
@@ -59,7 +61,7 @@ export function Header({ onSearchChange }: HeaderProps) {
     setLocalSearchTerm(term);
     // Call the parent component's state setter if provided
     if (onSearchChange) {
-      onSearchChange(term);
+      onSearchChange(term.toLowerCase()); // Convert search term to lowercase
     }
   };
 
@@ -71,11 +73,10 @@ export function Header({ onSearchChange }: HeaderProps) {
     { href: "/contact", label: "Contact Us" },
   ];
 
-  // Mobile Navigation Links (includes a simple Categories link for now)
+  // Mobile Navigation Links (only Home and Contact Us, categories handled by accordion)
    const mobileNavLinks = [
-     ...baseNavLinks.slice(0, 1), // Home
-     { href: "/products", label: "Categories" }, // Link to main products/category page for mobile
-     ...baseNavLinks.slice(2) // Contact Us
+     baseNavLinks[0], // Home
+     baseNavLinks[2] // Contact Us
    ];
 
 
@@ -92,23 +93,99 @@ export function Header({ onSearchChange }: HeaderProps) {
                  <span className="sr-only">Open Menu</span>
                </Button>
              </SheetTrigger>
-             <SheetContent side="left" className="w-full max-w-xs sm:max-w-sm">
-               {/* Add SheetHeader and visually hidden SheetTitle for accessibility */}
-               <SheetHeader className="sr-only">
-                  <SheetTitle>Main Navigation Menu</SheetTitle>
-                </SheetHeader>
-               <nav className="flex flex-col space-y-4 p-4">
-                 {/* Use mobile specific links */}
+             <SheetContent side="left" className="w-full max-w-xs sm:max-w-sm overflow-y-auto">
+               <SheetHeader>
+                  <SheetTitle className="text-left text-xl font-bold p-4 border-b">Menu</SheetTitle>
+               </SheetHeader>
+               <nav className="flex flex-col space-y-1 p-4">
+                 {/* Render basic links */}
                  {mobileNavLinks.map((link) => (
                     <SheetClose asChild key={link.href + link.label + '-mobile'}>
                        <Link
                          href={link.href}
-                         className="text-lg font-medium text-foreground transition-colors hover:text-primary"
+                         className="block py-2 text-lg font-medium text-foreground transition-colors hover:text-primary"
                        >
                          {link.label}
                        </Link>
                     </SheetClose>
                   ))}
+
+                 <Separator className="my-3" />
+
+                 {/* Categories Accordion */}
+                 <Accordion type="single" collapsible className="w-full">
+                    <p className="text-lg font-medium text-foreground py-2">Categories</p>
+                    {getMainCategories().map((category) => {
+                       const subCategories = getSubCategories(category);
+                       return (
+                           <AccordionItem key={`mobile-cat-${category}`} value={category} className="border-b-0">
+                             <AccordionTrigger className="text-base font-medium text-foreground/90 transition-colors hover:text-primary no-underline hover:no-underline py-2">
+                               {category}
+                             </AccordionTrigger>
+                             <AccordionContent className="pl-4 pb-1"> {/* Indent sub-items */}
+                               <div className="flex flex-col space-y-1">
+                                 {['New Arrivals', 'Best Sellers'].includes(category) ? (
+                                   <SheetClose asChild key={`mobile-${category}-link`}>
+                                     <Link
+                                       href="/coming-soon"
+                                       className="block py-1 text-sm text-muted-foreground transition-colors hover:text-primary"
+                                     >
+                                       View {category}
+                                     </Link>
+                                   </SheetClose>
+                                 ) : subCategories.length > 0 ? (
+                                   <>
+                                     {/* Link to the main category page */}
+                                     <SheetClose asChild key={`mobile-${category}-all-link`}>
+                                       <Link
+                                         href={createFilterLink(category)}
+                                         className="block py-1 text-sm font-medium text-foreground/80 transition-colors hover:text-primary"
+                                       >
+                                         All {category}
+                                       </Link>
+                                     </SheetClose>
+                                     <Separator className="my-1" />
+                                     {/* Links to sub-categories */}
+                                     {subCategories.map((subCategory) => (
+                                       <SheetClose asChild key={`mobile-${subCategory}-link`}>
+                                         <Link
+                                           href={createFilterLink(category, subCategory)}
+                                           className="block py-1 text-sm text-muted-foreground transition-colors hover:text-primary"
+                                         >
+                                           {subCategory}
+                                         </Link>
+                                       </SheetClose>
+                                     ))}
+                                   </>
+                                 ) : (
+                                    // Link to category page if no sub-categories (e.g., Photo Prints)
+                                    <SheetClose asChild key={`mobile-${category}-direct-link`}>
+                                      <Link
+                                        href={createFilterLink(category)}
+                                        className="block py-1 text-sm text-muted-foreground transition-colors hover:text-primary"
+                                      >
+                                        View {category}
+                                      </Link>
+                                    </SheetClose>
+                                 )}
+                               </div>
+                             </AccordionContent>
+                           </AccordionItem>
+                       );
+                    })}
+                     {/* Link to view all products */}
+                      <SheetClose asChild key="mobile-all-products-link">
+                          <Link
+                              href="/products"
+                              className="block py-2 text-base font-medium text-foreground/90 transition-colors hover:text-primary"
+                          >
+                              View All Products
+                          </Link>
+                      </SheetClose>
+                 </Accordion>
+
+                  <Separator className="my-3" />
+
                  {/* Search inside mobile menu */}
                  {onSearchChange && (
                     <div className="relative pt-4">
@@ -140,7 +217,7 @@ export function Header({ onSearchChange }: HeaderProps) {
               height={60} // Set appropriate height
               priority // Load logo faster
               className="h-auto" // Maintain aspect ratio, adjust height automatically
-              style={{ maxWidth: '150px' }} // Ensure it doesn't exceed a certain width
+              style={{ maxWidth: '150px', height: 'auto' }} // Ensure it doesn't exceed width, adjust height auto
             />
          </Link>
 
