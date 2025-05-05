@@ -24,6 +24,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"; // Import Dropdown components
 import { categoryStructure, getMainCategories, getSubCategories } from '@/lib/categories'; // Import categories
+import Image from 'next/image'; // Keep Image import if needed elsewhere, but remove from logo usage
 
 // Define props for the Header component
 interface HeaderProps {
@@ -128,7 +129,7 @@ export function Header({ onSearchChange }: HeaderProps) {
          </div>
 
 
-        {/* Logo - Replaced Image with text */}
+        {/* Logo - Replaced Image with text placeholder */}
          <Link href="/" className="flex items-center mx-auto md:mx-0 md:mr-4 shrink-0 text-2xl font-bold text-primary">
            BeYou
          </Link>
@@ -263,3 +264,4 @@ export function Header({ onSearchChange }: HeaderProps) {
     </header>
   );
 }
+
