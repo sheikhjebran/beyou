@@ -68,21 +68,23 @@ export function Header({ onSearchChange }: HeaderProps) {
   // Base Navigation Links Array (excluding categories dropdown)
   const baseNavLinks = [
     { href: "/", label: "Home" },
-    { href: "/#categories", label: "All Categories" }, // Link to categories section on home page
+    // { href: "/#categories", label: "All Categories" }, // Link to categories section on home page (Replaced by dropdown)
+    { href: "/products", label: "All Products" }, // Link to all products page
     // Category dropdown will be handled separately
     { href: "/contact", label: "Contact Us" },
   ];
 
-  // Mobile Navigation Links (only Home and Contact Us, categories handled by accordion)
+  // Mobile Navigation Links (excluding categories handled by accordion)
    const mobileNavLinks = [
      baseNavLinks[0], // Home
+     baseNavLinks[1], // All Products
      baseNavLinks[2] // Contact Us
    ];
 
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      {/* Adjusted height to h-20 or h-24 for more space */}
+      {/* Adjusted height to h-24 for logo */}
       <div className="container flex h-24 items-center justify-between gap-4">
         {/* Mobile Menu */}
         <div className="md:hidden">
@@ -93,9 +95,9 @@ export function Header({ onSearchChange }: HeaderProps) {
                  <span className="sr-only">Open Menu</span>
                </Button>
              </SheetTrigger>
-             <SheetContent side="left" className="w-full max-w-xs sm:max-w-sm overflow-y-auto">
-               <SheetHeader>
-                  <SheetTitle className="text-left text-xl font-bold p-4 border-b">Menu</SheetTitle>
+             <SheetContent side="left" className="w-full max-w-xs sm:max-w-sm overflow-y-auto p-0"> {/* Remove default padding */}
+               <SheetHeader className="p-4 border-b"> {/* Add padding back to header */}
+                  <SheetTitle className="text-left text-xl font-bold">Menu</SheetTitle>
                </SheetHeader>
                <nav className="flex flex-col space-y-1 p-4">
                  {/* Render basic links */}
@@ -173,15 +175,7 @@ export function Header({ onSearchChange }: HeaderProps) {
                            </AccordionItem>
                        );
                     })}
-                     {/* Link to view all products */}
-                      <SheetClose asChild key="mobile-all-products-link">
-                          <Link
-                              href="/products"
-                              className="block py-2 text-base font-medium text-foreground/90 transition-colors hover:text-primary"
-                          >
-                              View All Products
-                          </Link>
-                      </SheetClose>
+                     {/* Link to view all products is now under baseNavLinks */}
                  </Accordion>
 
                   <Separator className="my-3" />
@@ -207,17 +201,16 @@ export function Header({ onSearchChange }: HeaderProps) {
          </div>
 
 
-        {/* Logo */}
+        {/* Logo - Make sure BeYou.png exists in the /public directory */}
          <Link href="/" className="flex items-center mx-auto md:mx-0 md:mr-4 shrink-0">
-            {/* Use next/image for optimized logo loading */}
             <Image
-              src="/BeYou.png" // Path to your logo in the public folder
+              src="/BeYou.png" // Path to logo in the public folder
               alt="BeYou Logo"
-              width={150} // Set appropriate width
-              height={60} // Set appropriate height
+              width={150} // Original width for aspect ratio calculation
+              height={60} // Original height for aspect ratio calculation
               priority // Load logo faster
-              className="h-auto" // Maintain aspect ratio, adjust height automatically
-              style={{ maxWidth: '150px', height: 'auto' }} // Ensure it doesn't exceed width, adjust height auto
+              className="h-auto" // Maintain aspect ratio
+              style={{ maxWidth: '150px', maxHeight: '60px', height: 'auto', width: 'auto' }} // Adjust max height/width, allow auto scaling
             />
          </Link>
 
@@ -292,8 +285,8 @@ export function Header({ onSearchChange }: HeaderProps) {
                     }
                  })}
 
-                 <DropdownMenuSeparator />
-                 <DropdownMenuItem><Link href="/products">View All Products</Link></DropdownMenuItem>
+                 {/* <DropdownMenuSeparator />
+                 <DropdownMenuItem><Link href="/products">View All Products</Link></DropdownMenuItem> */} {/* Covered by baseNavLinks */}
 
               </DropdownMenuContent>
             </DropdownMenu>
