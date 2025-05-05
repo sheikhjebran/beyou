@@ -68,9 +68,7 @@ export function Header({ onSearchChange }: HeaderProps) {
   // Base Navigation Links Array (excluding categories dropdown)
   const baseNavLinks = [
     { href: "/", label: "Home" },
-    // { href: "/#categories", label: "All Categories" }, // Link to categories section on home page (Replaced by dropdown)
     { href: "/products", label: "All Products" }, // Link to all products page
-    // Category dropdown will be handled separately
     { href: "/contact", label: "Contact Us" },
   ];
 
@@ -209,7 +207,6 @@ export function Header({ onSearchChange }: HeaderProps) {
               width={150} // Set the desired width
               height={60} // Set the desired height to maintain aspect ratio
               priority // Load logo faster
-              // Removed className and inline style to rely on width/height props
             />
          </Link>
 
