@@ -3,6 +3,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import Image from 'next/image'; // Import Image component
 import { usePathname, useRouter } from 'next/navigation'; // Import useRouter
 import {
   SidebarProvider,
@@ -39,10 +40,22 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
     <SidebarProvider defaultOpen>
       <Sidebar side="left" variant="sidebar" collapsible="icon">
         <SidebarHeader>
-          <div className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
-             <Link href="/" className="font-bold text-lg text-primary group-data-[collapsible=icon]:hidden">
+          <div className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center h-16 px-2"> {/* Adjusted height and padding */}
+             {/* Option 1: Keep text logo for admin */}
+             <Link href="/admin" className="font-bold text-lg text-primary group-data-[collapsible=icon]:hidden">
                BeYou Admin
              </Link>
+             {/* Option 2: Use image logo in admin sidebar (adjust path and size) */}
+             {/* <Link href="/admin" className="group-data-[collapsible=icon]:hidden">
+               <Image
+                  src="/images/logo.png"
+                  alt="BeYou Admin Logo"
+                  width={40}
+                  height={40}
+                  className="h-10 w-auto"
+                  data-ai-hint="website logo"
+               />
+             </Link> */}
              <SidebarTrigger className="ml-auto group-data-[collapsible=icon]:ml-0" />
            </div>
         </SidebarHeader>
@@ -54,6 +67,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                   tooltip={{ children: "Dashboard", side: "right" }}
                   isActive={isActive('/admin')}
                   aria-label="Dashboard"
+                  suppressHydrationWarning
                 >
                   <LayoutDashboard />
                   <span>Dashboard</span>
@@ -66,6 +80,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                   tooltip={{ children: "Inventory", side: "right" }}
                   isActive={isActive('/admin/inventory')}
                   aria-label="Inventory"
+                  suppressHydrationWarning
                 >
                   <Package />
                   <span>Inventory</span>
@@ -82,6 +97,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                   <SidebarMenuButton
                     tooltip={{ children: "Back to Shop", side: "right" }}
                      aria-label="Back to Shop"
+                     suppressHydrationWarning
                    >
                     <Home />
                      <span className="group-data-[collapsible=icon]:hidden">Back to Shop</span>
@@ -95,6 +111,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                    aria-label="Logout"
                    onClick={handleLogout} // Use handleLogout function
                    className="text-destructive hover:bg-destructive/10"
+                   suppressHydrationWarning
                  >
                    <LogOut />
                    <span className="group-data-[collapsible=icon]:hidden">Logout</span>

@@ -2,6 +2,7 @@
 "use client";
 
 import Link from 'next/link';
+import Image from 'next/image'; // Import Image component
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input'; // Import Input
 import { LogIn, ShoppingCart, Search, Menu, ChevronDown } from 'lucide-react'; // Import Search icon, added Menu, ChevronDown
@@ -65,14 +66,14 @@ export function Header({ onSearchChange }: HeaderProps) {
   // Base Navigation Links Array (excluding categories dropdown)
   const baseNavLinks = [
     { href: "/", label: "Home" },
-    { href: "/#products", label: "All Products" }, // Scrolls down on home page
+    { href: "/#categories", label: "All Categories" }, // Link to categories section on home page
     // Category dropdown will be handled separately
     { href: "/contact", label: "Contact Us" },
   ];
 
   // Mobile Navigation Links (includes a simple Categories link for now)
    const mobileNavLinks = [
-     ...baseNavLinks.slice(0, 2), // Home, All Products
+     ...baseNavLinks.slice(0, 1), // Home
      { href: "/products", label: "Categories" }, // Link to main products/category page for mobile
      ...baseNavLinks.slice(2) // Contact Us
    ];
@@ -80,7 +81,7 @@ export function Header({ onSearchChange }: HeaderProps) {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 items-center justify-between gap-4">
+      <div className="container flex h-20 items-center justify-between gap-4"> {/* Increased height to h-20 */}
         {/* Mobile Menu */}
         <div className="md:hidden">
            <Sheet>
@@ -128,10 +129,19 @@ export function Header({ onSearchChange }: HeaderProps) {
          </div>
 
 
-        {/* Logo */}
-        <Link href="/" className="text-2xl font-bold text-primary tracking-tight mx-auto md:mx-0 md:mr-4 shrink-0">
-          BeYou
-        </Link>
+        {/* Logo - Replaced text with Image */}
+        <Link href="/" className="flex items-center mx-auto md:mx-0 md:mr-4 shrink-0">
+           {/* Assuming logo is saved in public/images/logo.png */}
+           <Image
+              src="/images/logo.png" // Path to your logo image in the public directory
+              alt="BeYou Logo"
+              width={60} // Adjust width as needed
+              height={60} // Adjust height as needed
+              className="h-14 w-auto" // Adjust Tailwind classes for size if preferred
+              data-ai-hint="website logo"
+              priority // Load logo early
+            />
+         </Link>
 
         {/* Main Navigation (Desktop) */}
         <nav className="hidden md:flex items-center space-x-6 text-sm font-medium flex-1 justify-center">
@@ -176,6 +186,15 @@ export function Header({ onSearchChange }: HeaderProps) {
                                              <Link href={createFilterLink(category, subCategory)}>{subCategory}</Link>
                                          </DropdownMenuItem>
                                      ))}
+                                     {/* Add link to main category page if subcategories exist */}
+                                     {getSubCategories(category).length > 0 && (
+                                         <>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem>
+                                                <Link href={createFilterLink(category)}>All {category}</Link>
+                                            </DropdownMenuItem>
+                                         </>
+                                     )}
                                  </DropdownMenuSubContent>
                              </DropdownMenuPortal>
                          </DropdownMenuSub>
@@ -185,6 +204,10 @@ export function Header({ onSearchChange }: HeaderProps) {
                  {/* Direct links for Coming Soon pages */}
                  <DropdownMenuItem><Link href="/coming-soon">New Arrivals</Link></DropdownMenuItem>
                  <DropdownMenuItem><Link href="/coming-soon">Best Sellers</Link></DropdownMenuItem>
+
+                 <DropdownMenuSeparator />
+                 <DropdownMenuItem><Link href="/products">View All Products</Link></DropdownMenuItem>
+
 
               </DropdownMenuContent>
             </DropdownMenu>
