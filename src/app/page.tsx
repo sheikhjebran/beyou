@@ -1,54 +1,29 @@
 
+
 "use client";
 
-import { useState, useEffect } from 'react'; // Added useEffect
-import { ProductGrid } from '@/components/product-grid';
-// import { mockProducts } from '@/lib/mock-data'; // Remove mock data import
+import { useState, useEffect } from 'react'; // Kept for potential future use, e.g., dynamic banner content
+// import { ProductGrid } from '@/components/product-grid'; // Removed ProductGrid
+// import type { Product } from '@/types/product'; // Removed Product type
+// import { getProducts } from '@/services/productService'; // Removed product service
 import { Header } from '@/components/header';
 import Image from 'next/image';
-import type { Product } from '@/types/product';
-import { getProducts } from '@/services/productService'; // Import service function
-import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; // Import Alert
-import { AlertCircle } from 'lucide-react'; // Import icon
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"; // Import Card components needed for Skeleton
+import { Skeleton } from '@/components/ui/skeleton'; // Keep Skeleton for potential loading states if needed
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; // Keep Alert for potential errors
+import { AlertCircle, Tag } from 'lucide-react'; // Added Tag icon for categories
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"; // Keep Card components
+import Link from 'next/link'; // Keep Link
+import { getMainCategories } from '@/lib/categories'; // Import category helper
 
 export default function Home() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [products, setProducts] = useState<Product[]>([]); // State for products
-  const [loading, setLoading] = useState(true); // Loading state
-  const [error, setError] = useState<string | null>(null); // Error state
+  // Removed product-related state: products, loading, error
 
+  // Removed useEffect hook for fetching products
 
-  // Fetch products from Firestore on component mount
-   useEffect(() => {
-     async function loadProducts() {
-       setLoading(true);
-       setError(null);
-       try {
-         const fetchedProducts = await getProducts();
-         setProducts(fetchedProducts);
-       } catch (err) {
-          console.error("Failed to load products on home page:", err);
-          setError(err instanceof Error ? err.message : "An unknown error occurred while fetching products.");
-       } finally {
-         setLoading(false);
-       }
-     }
-     loadProducts();
-   }, []);
+  // Removed product filtering logic
 
-
-  // Filter products based on search term and fetched data
-  const filteredProducts = products.filter((product: Product) => {
-    const term = searchTerm.trim().toLowerCase(); // Trim whitespace and convert to lower case
-    if (!term) return true; // If search term is empty after trimming, show all products
-
-    const nameMatch = (product.name?.toLowerCase() ?? '').includes(term);
-    const descriptionMatch = (product.description?.toLowerCase() ?? '').includes(term);
-    return nameMatch || descriptionMatch;
-  });
-
+  const categories = getMainCategories(); // Get category list
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -63,6 +38,7 @@ export default function Home() {
              fill // Use fill instead of layout
              style={{ objectFit: 'cover' }} // Add objectFit style
             priority
+            data-ai-hint="beauty fashion banner"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/30 to-transparent" />
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 text-white">
@@ -75,50 +51,52 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Product Grid Section */}
-        <section id="products" className="p-6">
-           <h2 className="mb-8 text-3xl font-bold tracking-tight text-center">Our Products</h2>
+        {/* Category Grid Section - Replaced Product Grid */}
+        <section id="categories" className="p-6">
+          <h2 className="mb-8 text-3xl font-bold tracking-tight text-center text-foreground">Explore Our Categories</h2>
 
-           {error && (
-               <Alert variant="destructive" className="mb-8 max-w-2xl mx-auto">
-                 <AlertCircle className="h-4 w-4" />
-                 <AlertTitle>Error Loading Products</AlertTitle>
-                 <AlertDescription>{error}</AlertDescription>
-               </Alert>
-            )}
+          {/* Removed product error handling */}
+          {/* Removed product loading skeleton */}
 
-
-            {loading ? (
-             // Skeleton Grid while loading
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {Array.from({ length: 8 }).map((_, index) => (
-                   <Card key={`skeleton-card-${index}`} className="w-full max-w-sm overflow-hidden rounded-lg shadow-lg">
+           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+             {categories.map((category) => (
+               <Link key={category} href={`/products?category=${encodeURIComponent(category)}`} passHref legacyBehavior>
+                 <a className="group block"> {/* Make the anchor tag the group */}
+                   <Card className="w-full overflow-hidden rounded-lg shadow-lg transition-transform duration-300 group-hover:scale-105 group-hover:shadow-xl">
                      <CardHeader className="p-0">
-                       <Skeleton className="aspect-[4/3] w-full bg-muted" />
+                       <div className="relative aspect-[4/3] w-full">
+                         <Image
+                           // Using picsum with a seed based on category name for variety
+                           src={`https://picsum.photos/seed/${encodeURIComponent(category)}/400/300`}
+                           alt={`${category} category`}
+                           fill
+                           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                           style={{ objectFit: 'cover' }}
+                           className="transition-opacity duration-300 group-hover:opacity-90"
+                           data-ai-hint={`${category.toLowerCase()} category image`} // AI Hint for images
+                         />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-70 group-hover:opacity-50 transition-opacity duration-300" />
+                       </div>
                      </CardHeader>
-                     <CardContent className="p-4 space-y-2">
-                       <Skeleton className="h-5 w-3/4" />
-                       <Skeleton className="h-4 w-1/2" />
-                       <Skeleton className="h-8 w-1/3 mt-2" />
-                      </CardContent>
-                      <CardFooter className="p-4 pt-0">
-                        <Skeleton className="h-10 w-full" />
-                      </CardFooter>
-                    </Card>
-                 ))}
-               </div>
-            ) : (
-               // Actual Product Grid or No Products Message
-               filteredProducts.length > 0 ? (
-                 <ProductGrid products={filteredProducts} />
-               ) : (
-                 <p className="text-center text-muted-foreground mt-8">
-                   {searchTerm
-                     ? `No products found matching "${searchTerm}".`
-                     : "No products currently available. Check back soon!"}
-                 </p>
-               )
-            )}
+                     <CardContent className="p-4 bg-card/80 backdrop-blur-sm">
+                       <div className="flex items-center gap-2">
+                         <Tag className="h-5 w-5 text-primary shrink-0" />
+                         <CardTitle className="text-lg font-semibold text-card-foreground truncate group-hover:text-primary transition-colors">
+                           {category}
+                         </CardTitle>
+                       </div>
+                        {/* Optional: Add a short description or sub-category count later */}
+                       {/* <CardDescription className="mt-1 text-sm text-muted-foreground line-clamp-1">
+                         Explore {category} products...
+                       </CardDescription> */}
+                     </CardContent>
+                   </Card>
+                 </a>
+               </Link>
+             ))}
+           </div>
+
+            {/* Removed No Products Message */}
         </section>
 
       </main>
@@ -128,3 +106,4 @@ export default function Home() {
     </div>
   );
 }
+
