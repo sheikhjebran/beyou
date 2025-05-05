@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'; // Import Input
 import { LogIn, ShoppingCart, Search, Menu, ChevronDown } from 'lucide-react'; // Import Search icon, added Menu, ChevronDown
 import { useCart } from '@/hooks/use-cart'; // Import the useCart hook
 import { Badge } from '@/components/ui/badge'; // Import Badge
-import { useState, useEffect } from 'react'; // Import useState and useEffect
+import React, { useState, useEffect } from 'react'; // Import useState and useEffect
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from "@/components/ui/sheet"; // Import Sheet components, including SheetHeader and SheetTitle
 import {
   DropdownMenu,
@@ -86,7 +86,7 @@ export function Header({ onSearchChange }: HeaderProps) {
         <div className="md:hidden">
            <Sheet>
              <SheetTrigger asChild>
-               <Button variant="outline" size="icon">
+               <Button variant="outline" size="icon" suppressHydrationWarning>
                  <Menu className="h-5 w-5" />
                  <span className="sr-only">Open Menu</span>
                </Button>
@@ -133,11 +133,11 @@ export function Header({ onSearchChange }: HeaderProps) {
         <Link href="/" className="flex items-center mx-auto md:mx-0 md:mr-4 shrink-0">
            {/* Assuming logo is saved in public/images/logo.png */}
            <Image
-              src="/images/logo.png" // Path to your logo image in the public directory
+              src="/images/logo.png" // Updated path to the new logo
               alt="BeYou Logo"
-              width={60} // Adjust width as needed
-              height={60} // Adjust height as needed
-              className="h-16 w-auto" // Adjust Tailwind classes for size if preferred, Increased height to h-16
+              width={60} // Keep existing width or adjust as needed
+              height={60} // Keep existing height or adjust as needed
+              className="h-16 w-auto" // Keep existing Tailwind classes for size (h-16 matches h-20 header nicely)
               data-ai-hint="website logo"
               priority // Load logo early
             />
@@ -164,7 +164,7 @@ export function Header({ onSearchChange }: HeaderProps) {
            {/* Categories Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="text-sm font-medium text-foreground transition-colors hover:text-primary px-0">
+                <Button variant="ghost" className="text-sm font-medium text-foreground transition-colors hover:text-primary px-0" suppressHydrationWarning>
                   Categories <ChevronDown className="relative top-[1px] ml-1 h-3 w-3 transition duration-200 group-data-[state=open]:rotate-180" />
                 </Button>
               </DropdownMenuTrigger>
