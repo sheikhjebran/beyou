@@ -3,7 +3,6 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import Image from 'next/image'; // Import Image component
 import { usePathname, useRouter } from 'next/navigation'; // Import useRouter
 import {
   SidebarProvider,
@@ -41,18 +40,11 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       <Sidebar side="left" variant="sidebar" collapsible="icon">
         <SidebarHeader>
           <div className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center h-20 px-2"> {/* Adjusted height to h-20 */}
-             {/* Use image logo in admin sidebar */}
-             <Link href="/admin" className="group-data-[collapsible=icon]:hidden">
-               <Image
-                  src="/images/logo.png" // Use the same logo path
-                  alt="BeYou Admin Logo"
-                  width={60} // Match header width
-                  height={60} // Match header height
-                  className="h-16 w-auto" // Match header class
-                  data-ai-hint="website logo"
-               />
+             {/* Use text logo in admin sidebar */}
+             <Link href="/admin" className="group-data-[collapsible=icon]:hidden text-xl font-bold text-primary">
+                BeYou Admin
              </Link>
-             <SidebarTrigger className="ml-auto group-data-[collapsible=icon]:ml-0" />
+             <SidebarTrigger className="ml-auto group-data-[collapsible=icon]:ml-0" suppressHydrationWarning/>
            </div>
         </SidebarHeader>
         <SidebarContent>

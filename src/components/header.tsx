@@ -2,7 +2,6 @@
 "use client";
 
 import Link from 'next/link';
-import Image from 'next/image'; // Import Image component
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input'; // Import Input
 import { LogIn, ShoppingCart, Search, Menu, ChevronDown } from 'lucide-react'; // Import Search icon, added Menu, ChevronDown
@@ -129,18 +128,9 @@ export function Header({ onSearchChange }: HeaderProps) {
          </div>
 
 
-        {/* Logo - Replaced text with Image */}
-        <Link href="/" className="flex items-center mx-auto md:mx-0 md:mr-4 shrink-0">
-           {/* Assuming logo is saved in public/images/logo.png */}
-           <Image
-              src="/images/logo.png" // Updated path to the new logo
-              alt="BeYou Logo"
-              width={60} // Keep existing width or adjust as needed
-              height={60} // Keep existing height or adjust as needed
-              className="h-16 w-auto" // Keep existing Tailwind classes for size (h-16 matches h-20 header nicely)
-              data-ai-hint="website logo"
-              priority // Load logo early
-            />
+        {/* Logo - Replaced Image with text */}
+         <Link href="/" className="flex items-center mx-auto md:mx-0 md:mr-4 shrink-0 text-2xl font-bold text-primary">
+           BeYou
          </Link>
 
         {/* Main Navigation (Desktop) */}
