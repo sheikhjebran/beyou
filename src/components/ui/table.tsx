@@ -1,3 +1,4 @@
+
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
@@ -54,16 +55,16 @@ TableFooter.displayName = "TableFooter"
 const TableRow = React.forwardRef<
   HTMLTableRowElement,
   React.HTMLAttributes<HTMLTableRowElement>
-// Ensure no extraneous whitespace is rendered inside this component by removing parentheses
->(({ className, children, ...props }, ref) => <tr
+// Ensure no extraneous whitespace is rendered inside this component
+>(({ className, children, ...props }, ref) => (
+  <tr
     ref={ref}
     className={cn(
       "border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted",
       className
     )}
-    {...props}
-  >{children}</tr>
-)
+    {...props}>{children}</tr>
+));
 TableRow.displayName = "TableRow"
 
 const TableHead = React.forwardRef<
@@ -115,4 +116,5 @@ export {
   TableCell,
   TableCaption,
 }
+
 
