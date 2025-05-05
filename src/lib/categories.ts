@@ -1,8 +1,7 @@
 
 /**
  * Defines the structure for product categories and sub-categories.
- * Used to populate selection dropdowns in admin forms.
- * Note: "New Arrivals" and "Best Sellers" are dynamic and not included here.
+ * Used to populate selection dropdowns in admin forms and navigation.
  */
 export const categoryStructure = {
   'K-Beauty': [
@@ -32,7 +31,6 @@ export const categoryStructure = {
     'Value Sets',
     'Limited-Time Offers',
   ],
-  // Add 'Clothing' as a top-level category if needed, with its own sub-categories
   'Clothing': [
      'Tops',
      'Bottoms',
@@ -40,11 +38,15 @@ export const categoryStructure = {
      'Outerwear',
      'Accessories', // Example sub-categories for Clothing
   ],
+  'Photo Prints': [], // Added Photo Prints category
   // Add a generic 'Other' category if needed
   'Other': ['Miscellaneous'],
 };
 
+// Type representing the main categories
 export type Category = keyof typeof categoryStructure;
+
+// Type representing sub-categories for a given main category T
 export type SubCategory<T extends Category> = (typeof categoryStructure)[T][number];
 
 // Helper function to get main categories
@@ -54,5 +56,9 @@ export function getMainCategories(): Category[] {
 
 // Helper function to get sub-categories for a given main category
 export function getSubCategories<T extends Category>(category: T): SubCategory<T>[] {
-  return categoryStructure[category] || [];
+  // Ensure the category exists in the structure before trying to access its sub-categories
+  if (category in categoryStructure) {
+    return categoryStructure[category] || [];
+  }
+  return []; // Return empty array if category doesn't exist
 }

@@ -23,8 +23,8 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"; // Import Dropdown components
-import { categoryStructure, getMainCategories, getSubCategories } from '@/lib/categories'; // Import categories
-import Image from 'next/image'; // Keep Image import if needed elsewhere, but remove from logo usage
+import { getMainCategories, getSubCategories } from '@/lib/categories'; // Import categories
+import Image from 'next/image'; // Import Image
 
 // Define props for the Header component
 interface HeaderProps {
@@ -81,7 +81,8 @@ export function Header({ onSearchChange }: HeaderProps) {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-20 items-center justify-between gap-4"> {/* Adjusted height to h-20 */}
+      {/* Adjusted height to h-20 or h-24 for more space */}
+      <div className="container flex h-24 items-center justify-between gap-4">
         {/* Mobile Menu */}
         <div className="md:hidden">
            <Sheet>
@@ -129,9 +130,18 @@ export function Header({ onSearchChange }: HeaderProps) {
          </div>
 
 
-        {/* Logo - Replaced Image with text placeholder */}
-         <Link href="/" className="flex items-center mx-auto md:mx-0 md:mr-4 shrink-0 text-2xl font-bold text-primary">
-           BeYou
+        {/* Logo */}
+         <Link href="/" className="flex items-center mx-auto md:mx-0 md:mr-4 shrink-0">
+            {/* Use next/image for optimized logo loading */}
+            <Image
+              src="/BeYou.png" // Path to your logo in the public folder
+              alt="BeYou Logo"
+              width={150} // Set appropriate width
+              height={60} // Set appropriate height
+              priority // Load logo faster
+              className="h-auto" // Maintain aspect ratio, adjust height automatically
+              style={{ maxWidth: '150px' }} // Ensure it doesn't exceed a certain width
+            />
          </Link>
 
         {/* Main Navigation (Desktop) */}
@@ -161,44 +171,52 @@ export function Header({ onSearchChange }: HeaderProps) {
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56">
                  {/* Dynamically generate categories and sub-categories */}
-                 {getMainCategories().map((category) => (
-                     // Skip categories that are direct links like 'New Arrivals' if handled separately
-                     category !== 'New Arrivals' && category !== 'Best Sellers' ? (
-                         <DropdownMenuSub key={category}>
-                             <DropdownMenuSubTrigger>
-                                 {/* Link for the main category */}
-                                 <Link href={createFilterLink(category)} className="flex-1">{category}</Link>
-                             </DropdownMenuSubTrigger>
-                             <DropdownMenuPortal>
-                                 <DropdownMenuSubContent>
-                                     {getSubCategories(category).map((subCategory) => (
-                                         <DropdownMenuItem key={subCategory}>
-                                             {/* Link for the sub-category */}
-                                             <Link href={createFilterLink(category, subCategory)}>{subCategory}</Link>
+                 {getMainCategories().map((category) => {
+                    const subCategories = getSubCategories(category);
+                    // Handle categories like 'New Arrivals', 'Best Sellers' directly
+                    if (['New Arrivals', 'Best Sellers'].includes(category)) {
+                        return (
+                             <DropdownMenuItem key={category}>
+                                <Link href="/coming-soon">{category}</Link>
+                             </DropdownMenuItem>
+                        );
+                    // Handle categories with sub-categories
+                    } else if (subCategories.length > 0) {
+                         return (
+                             <DropdownMenuSub key={category}>
+                                 <DropdownMenuSubTrigger>
+                                     {/* Link for the main category */}
+                                     <Link href={createFilterLink(category)} className="flex-1">{category}</Link>
+                                 </DropdownMenuSubTrigger>
+                                 <DropdownMenuPortal>
+                                     <DropdownMenuSubContent>
+                                         {subCategories.map((subCategory) => (
+                                             <DropdownMenuItem key={subCategory}>
+                                                 {/* Link for the sub-category */}
+                                                 <Link href={createFilterLink(category, subCategory)}>{subCategory}</Link>
+                                             </DropdownMenuItem>
+                                         ))}
+                                         {/* Add link to main category page if subcategories exist */}
+                                         <DropdownMenuSeparator />
+                                         <DropdownMenuItem>
+                                             <Link href={createFilterLink(category)}>All {category}</Link>
                                          </DropdownMenuItem>
-                                     ))}
-                                     {/* Add link to main category page if subcategories exist */}
-                                     {getSubCategories(category).length > 0 && (
-                                         <>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem>
-                                                <Link href={createFilterLink(category)}>All {category}</Link>
-                                            </DropdownMenuItem>
-                                         </>
-                                     )}
-                                 </DropdownMenuSubContent>
-                             </DropdownMenuPortal>
-                         </DropdownMenuSub>
-                     ) : null
-                 ))}
-
-                 {/* Direct links for Coming Soon pages */}
-                 <DropdownMenuItem><Link href="/coming-soon">New Arrivals</Link></DropdownMenuItem>
-                 <DropdownMenuItem><Link href="/coming-soon">Best Sellers</Link></DropdownMenuItem>
+                                     </DropdownMenuSubContent>
+                                 </DropdownMenuPortal>
+                             </DropdownMenuSub>
+                         );
+                    // Handle categories with NO sub-categories (like Photo Prints)
+                    } else {
+                        return (
+                           <DropdownMenuItem key={category}>
+                               <Link href={createFilterLink(category)}>{category}</Link>
+                           </DropdownMenuItem>
+                        );
+                    }
+                 })}
 
                  <DropdownMenuSeparator />
                  <DropdownMenuItem><Link href="/products">View All Products</Link></DropdownMenuItem>
-
 
               </DropdownMenuContent>
             </DropdownMenu>
@@ -264,4 +282,3 @@ export function Header({ onSearchChange }: HeaderProps) {
     </header>
   );
 }
-
