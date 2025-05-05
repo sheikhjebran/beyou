@@ -81,7 +81,7 @@ export function Header({ onSearchChange }: HeaderProps) {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-20 items-center justify-between gap-4"> {/* Increased height to h-20 */}
+      <div className="container flex h-20 items-center justify-between gap-4"> {/* Adjusted height to h-20 */}
         {/* Mobile Menu */}
         <div className="md:hidden">
            <Sheet>
@@ -137,7 +137,7 @@ export function Header({ onSearchChange }: HeaderProps) {
               alt="BeYou Logo"
               width={60} // Adjust width as needed
               height={60} // Adjust height as needed
-              className="h-14 w-auto" // Adjust Tailwind classes for size if preferred
+              className="h-16 w-auto" // Adjust Tailwind classes for size if preferred, Increased height to h-16
               data-ai-hint="website logo"
               priority // Load logo early
             />
