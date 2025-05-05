@@ -206,11 +206,10 @@ export function Header({ onSearchChange }: HeaderProps) {
             <Image
               src="/BeYou.png" // Path to logo in the public folder
               alt="BeYou Logo"
-              width={150} // Original width for aspect ratio calculation
-              height={60} // Original height for aspect ratio calculation
+              width={150} // Set the desired width
+              height={60} // Set the desired height to maintain aspect ratio
               priority // Load logo faster
-              className="h-auto" // Maintain aspect ratio
-              style={{ maxWidth: '150px', maxHeight: '60px', height: 'auto', width: 'auto' }} // Adjust max height/width, allow auto scaling
+              // Removed className and inline style to rely on width/height props
             />
          </Link>
 
