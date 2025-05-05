@@ -204,8 +204,9 @@ export function Header({ onSearchChange }: HeaderProps) {
             <Image
               src="/BeYou.png" // Path to logo in the public folder
               alt="BeYou Logo"
-              width={150} // Set the desired width
-              height={60} // Set the desired height to maintain aspect ratio
+              width={150} // Adjusted width
+              height={60} // Adjusted height to fit within h-24 header
+              style={{ objectFit: 'contain' }} // Use contain to prevent cropping
               priority // Load logo faster
             />
          </Link>
@@ -348,3 +349,4 @@ export function Header({ onSearchChange }: HeaderProps) {
     </header>
   );
 }
+
