@@ -31,14 +31,8 @@ export const categoryStructure = {
     'Value Sets',
     'Limited-Time Offers',
   ],
-  'Clothing': [
-     'Tops',
-     'Bottoms',
-     'Dresses',
-     'Outerwear',
-     'Accessories', // Example sub-categories for Clothing
-  ],
-  'Photo Prints': [], // Added Photo Prints category
+  // 'Clothing' category removed
+  'Custom Prints': [], // Renamed from Photo Prints
   // Add a generic 'Other' category if needed
   'Other': ['Miscellaneous'],
 };
@@ -62,3 +56,4 @@ export function getSubCategories<T extends Category>(category: T): SubCategory<T
   }
   return []; // Return empty array if category doesn't exist
 }
+

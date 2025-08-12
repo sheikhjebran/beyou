@@ -1,288 +1,287 @@
 
 
-'use server'; // Required for server-side actions
-
+// Firebase client SDK operations are typically client-side.
 import { db, storage } from '@/lib/firebase';
-import { collection, getDocs, addDoc, doc, updateDoc, serverTimestamp, FirestoreError, query, orderBy, limit, Timestamp, getDoc } from 'firebase/firestore'; // Import FirestoreError, query, orderBy, limit, Timestamp, getDoc
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { collection, getDocs, addDoc, doc, updateDoc, serverTimestamp, FirestoreError, query, orderBy, limit, Timestamp, getDoc, deleteDoc, runTransaction, where } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import type { Product } from '@/types/product';
-import { getMainCategories, getSubCategories, type Category } from '@/lib/categories'; // Import category helpers
+import { getMainCategories, getSubCategories, type Category } from '@/lib/categories';
 
 // Default placeholder image URL
-const DEFAULT_IMAGE_URL = 'https://picsum.photos/seed/productplaceholder/400/300';
+const DEFAULT_PRIMARY_IMAGE_URL = 'https://placehold.co/400x300.png';
+const FIREBASE_STORAGE_DOMAIN = 'elegance-boutique-m9ypf.firebasestorage.app';
 
-// Type for adding a new product (omits id, includes File for image)
-// Now includes category and subCategory
-export type AddProductData = Omit<Product, 'id' | 'imageUrl' | 'createdAt' | 'updatedAt'> & { // Exclude timestamps
-    imageFile?: File | null;
+
+// Type for adding a new product
+export type AddProductData = Omit<Product, 'id' | 'primaryImageUrl' | 'imageUrls' | 'createdAt' | 'updatedAt'> & {
+    imageFiles?: File[] | null;
+    primaryImageIndex?: number; // Index of the primary image within imageFiles
 };
 
-// Type for updating an existing product (optional fields, includes File for image)
-// Now includes optional category and subCategory
-export type UpdateProductData = Partial<Omit<Product, 'id' | 'imageUrl' | 'createdAt' | 'updatedAt'>> & { // Exclude timestamps
-    imageFile?: File | null;
+// Type for updating an existing product
+export type UpdateProductData = Partial<Omit<Product, 'id' | 'primaryImageUrl' | 'imageUrls' | 'createdAt' | 'updatedAt'>> & {
+    imageFiles?: File[] | null; // Array of files for replacement, or null to remove all
+    newPrimaryImageIndexForUpload?: number; // If imageFiles are provided, this is the index for the primary
+    makeExistingImagePrimary?: string;    // If no imageFiles, this URL from existing images becomes primary
 };
 
-// Helper to convert Firestore Timestamp to a serializable format (ISO string)
-// Returns null if the timestamp is invalid or missing
+// Type for a sale record
+export type SaleRecord = {
+  id?: string; // Firestore document ID
+  productId: string;
+  productName: string;
+  quantitySold: number;
+  salePricePerUnit: number; // Price per unit at the time of sale
+  totalSaleAmount: number; // quantitySold * salePricePerUnit
+  saleTimestamp: Timestamp; // Firestore Timestamp
+};
+
+// Type for today's sales summary
+export type TodaysSalesSummary = {
+  ordersToday: number;
+  salesTodayAmount: number;
+};
+
+// Type for product sales summary (for analytics)
+export type ProductSaleSummary = {
+  productId: string;
+  productName: string;
+  totalQuantitySold: number;
+};
+
+// Type for top sales by quantity in a single order
+export type TopSaleByQuantity = {
+  id: string; // Sale document ID
+  productName: string;
+  quantitySold: number;
+  saleDate: string; // Formatted sale date
+};
+
+
 const serializeTimestamp = (timestamp: unknown): string | null => {
   if (timestamp instanceof Timestamp) {
     return timestamp.toDate().toISOString();
   }
-  // Handle cases where timestamp might already be a string or number (e.g., from previous storage)
   if (typeof timestamp === 'string') {
-     // Could add validation here if needed
+     // Assuming it's already an ISO string
      return timestamp;
   }
   if (typeof timestamp === 'number') {
+      // Assuming it's a Unix timestamp in milliseconds
       return new Date(timestamp).toISOString();
   }
   return null;
 };
 
-
-/**
- * Fetches all products from the Firestore 'products' collection.
- * Returns only serializable fields suitable for client components.
- * Products are sorted by name by default.
- * Requires a composite index: products(name ASC).
- * @returns Promise<Product[]> An array of products.
- */
-export async function getProducts(): Promise<Product[]> {
-    try {
-        console.log("Attempting to fetch products from Firestore...");
-        const productsCollection = collection(db, 'products');
-        // Ensure the index exists: Collection: products, Fields: name ASC
-        const q = query(productsCollection, orderBy('name', 'asc'));
-        const productSnapshot = await getDocs(q); // Use the query 'q' here
-
-        // Map documents to Product type, ensuring serializable fields
-        const productList = productSnapshot.docs.map(doc => {
-             const data = doc.data();
-             // Ensure only fields defined in the Product type are included
-             const product: Product = {
-                id: doc.id,
-                name: data.name,
-                type: data.type ?? 'Beauty', // Provide default if missing
-                category: data.category ?? 'Other', // Provide default if missing
-                subCategory: data.subCategory ?? 'Miscellaneous', // Provide default if missing
-                description: data.description,
-                price: data.price,
-                imageUrl: data.imageUrl || DEFAULT_IMAGE_URL, // Use default if imageUrl is missing
-                quantity: data.quantity,
-                // Timestamps are NOT included here to avoid serialization issues for client components
-                // createdAt: serializeTimestamp(data.createdAt),
-                // updatedAt: serializeTimestamp(data.updatedAt),
-            };
-            return product;
-        });
-
-        console.log(`Successfully fetched ${productList.length} products.`);
-        return productList;
-    } catch (error) {
-        console.error("Error fetching products from Firestore: ", error);
-        // Provide more specific feedback based on the error type if possible
-        if (error instanceof FirestoreError) {
-            console.error(`Firestore Error Code: ${error.code}`);
-             if (error.code === 'permission-denied') {
-                 throw new Error("Permission denied when fetching products. Check Firestore security rules.");
-             } else if (error.code === 'unauthenticated') {
-                 throw new Error("User is unauthenticated. Cannot fetch products.");
-             } else if (error.code === 'unavailable') {
-                throw new Error("Firestore is currently unavailable. Please try again later.");
-             } else if (error.code === 'failed-precondition' && error.message.includes('index')) {
-                 // Suggest creating the index
-                 const indexCreationMessage = `Firestore index required for sorting/filtering products. Please create the necessary index in your Firebase console (e.g., for sorting by 'name'). Error: ${error.message}`;
-                 console.error(indexCreationMessage);
-                 throw new Error("Database index required for sorting/filtering. Please check server logs or Firebase console to create the required index.");
-             }
-            throw new Error(`Failed to fetch products due to Firestore error: ${error.message}`);
-        }
-        // Fallback for generic errors
-        throw new Error(`Failed to fetch products. Original error: ${error instanceof Error ? error.message : String(error)}`);
-    }
-}
-
-
-/**
- * Fetches the most recently added or updated product from Firestore.
- * Uses the 'updatedAt' timestamp primarily, falling back to 'createdAt'.
- * Requires a composite index: products(updatedAt DESC, createdAt DESC).
- * Handles cases where the index is still building.
- * @returns Promise<Product | null> The most recent product or null if none exist or on error.
- */
-export async function getMostRecentProduct(): Promise<Product | null> {
-    try {
-        console.log("Attempting to fetch the most recent product...");
-        const productsCollection = collection(db, 'products');
-
-        // Query for the latest product based on 'updatedAt', then 'createdAt'
-        // Firestore requires an index for queries involving multiple orderBy clauses
-        // or orderBy on one field and limit on another. Ensure this index exists:
-        // Collection: products, Fields: updatedAt DESC, createdAt DESC
-        const q = query(
-            productsCollection,
-            orderBy('updatedAt', 'desc'), // Order by most recent update first
-            orderBy('createdAt', 'desc'), // Then by most recent creation
-            limit(1) // Get only the top one
-        );
-
-        const productSnapshot = await getDocs(q);
-
-        if (productSnapshot.empty) {
-            console.log("No products found.");
-            return null;
-        }
-
-        const doc = productSnapshot.docs[0];
-        const data = doc.data();
-
-        // Map to Product type, ensuring serializable fields
-        const recentProduct: Product = {
-            id: doc.id,
-            name: data.name,
-            type: data.type ?? 'Beauty', // Provide default if missing
-            category: data.category ?? 'Other', // Provide default if missing
-            subCategory: data.subCategory ?? 'Miscellaneous', // Provide default if missing
-            description: data.description,
-            price: data.price,
-            imageUrl: data.imageUrl || DEFAULT_IMAGE_URL,
-            quantity: data.quantity,
-            // Include serialized timestamps if needed for display, otherwise omit
-            createdAt: serializeTimestamp(data.createdAt), // Include serializable timestamp
-            updatedAt: serializeTimestamp(data.updatedAt), // Include serializable timestamp
-        };
-
-        console.log("Successfully fetched the most recent product:", recentProduct.id);
-        return recentProduct;
-
-    } catch (error) {
-        console.error("Error fetching the most recent product: ", error);
-        if (error instanceof FirestoreError) {
-            console.error(`Firestore Error Code: ${error.code}`);
-             if (error.code === 'permission-denied') {
-                 console.error("Permission denied when fetching recent product. Check Firestore security rules.");
-                 return null; // Return null for dashboard resilience
-             } else if (error.code === 'unauthenticated') {
-                 console.error("User is unauthenticated. Cannot fetch recent product.");
-                 return null; // Return null here
-             } else if (error.code === 'failed-precondition' && error.message.includes('index')) {
-                 // Check if the error message indicates the index is building
-                 const isBuilding = error.message.includes('currently building');
-                 const indexInfoMessage = `
-##############################################################################
-# ACTION REQUIRED / INFO: Firestore Index Issue for Recent Products Query    #
-##############################################################################
-#
-# The query to fetch the most recent product requires a Firestore index
-# for the 'products' collection with fields:
-# 1. updatedAt (Descending)
-# 2. createdAt (Descending)
-#
-# Status: ${isBuilding ? 'INDEX IS CURRENTLY BUILDING' : 'INDEX MISSING OR MISCONFIGURED'}
-#
-${isBuilding
-? '# The required index is still being created by Firebase. This is temporary.'
-: '# Please create this index in your Firebase Console.'}
-# The application will show 'N/A' for the recent product until the index is ready.
-#
-# You can often create/check the index using the link provided in the
-# full Firebase error message below or in your Firebase Console.
-#
-# Link from error (if available):
-# ${error.message.match(/https?:\/\/[^\s]+/) ? error.message.match(/https?:\/\/[^\s]+/)?.[0] : 'See Firebase Console logs.'}
-#
-# Original Error: ${error.message}
-#
-##############################################################################
-`;
-                 console.warn(indexInfoMessage); // Use warn for building, error if missing might be better
-                 // Return null to allow the rest of the dashboard to load gracefully
-                 return null; // Return null here
-             } else {
-                 // Log other Firestore errors but still return null for resilience
-                 console.error(`Failed to fetch recent product due to Firestore error: ${error.message}. Returning null.`);
-                 return null; // Return null here
-             }
-        }
-        // Fallback for generic errors - also return null for dashboard resilience
-        console.error(`Failed to fetch recent product. Original error: ${error instanceof Error ? error.message : String(error)}`);
-        return null; // Return null here
-    }
-}
-
-/**
- * Fetches a single product by its ID from Firestore.
- * Returns only serializable fields suitable for client components.
- * @param productId The ID of the product to fetch.
- * @returns Promise<Product | null> The product or null if not found.
- */
-export async function getProductById(productId: string): Promise<Product | null> {
+async function deleteImageFromStorage(imageUrl: string | undefined | null): Promise<void> {
+  if (!imageUrl || imageUrl === DEFAULT_PRIMARY_IMAGE_URL || !imageUrl.includes(FIREBASE_STORAGE_DOMAIN)) {
+    return;
+  }
   try {
-    console.log(`Attempting to fetch product with ID: ${productId}...`);
-    const productDocRef = doc(db, 'products', productId);
-    const productDoc = await getDoc(productDocRef);
-
-    if (!productDoc.exists()) {
-      console.log(`Product with ID ${productId} not found.`);
-      return null;
+    const url = new URL(imageUrl);
+    const pathName = url.pathname;
+    const prefix = `/v0/b/${FIREBASE_STORAGE_DOMAIN}/o/`;
+    if (pathName.startsWith(prefix)) {
+        let filePath = pathName.substring(prefix.length);
+        filePath = filePath.split('?')[0];
+        if (filePath) {
+            const imageRef = ref(storage, decodeURIComponent(filePath));
+            await deleteObject(imageRef);
+        }
     }
-
-    const data = productDoc.data();
-    const product: Product = {
-      id: productDoc.id,
-      name: data.name,
-      type: data.type ?? 'Beauty', // Provide default if missing
-      category: data.category ?? 'Other', // Provide default if missing
-      subCategory: data.subCategory ?? 'Miscellaneous', // Provide default if missing
-      description: data.description,
-      price: data.price,
-      imageUrl: data.imageUrl || DEFAULT_IMAGE_URL,
-      quantity: data.quantity,
-      createdAt: serializeTimestamp(data.createdAt), // Include serializable timestamp
-      updatedAt: serializeTimestamp(data.updatedAt), // Include serializable timestamp
-    };
-
-    console.log(`Successfully fetched product: ${productId}`);
-    return product;
   } catch (error) {
-    console.error(`Error fetching product with ID ${productId}: `, error);
-    if (error instanceof FirestoreError) {
-      console.error(`Firestore Error Code: ${error.code}`);
-      if (error.code === 'permission-denied') {
-        throw new Error(`Permission denied when fetching product ${productId}. Check Firestore security rules.`);
-      } else if (error.code === 'unauthenticated') {
-        throw new Error(`User is unauthenticated. Cannot fetch product ${productId}.`);
-      }
-      throw new Error(`Failed to fetch product ${productId} due to Firestore error: ${error.message}`);
+    const storageErrorCode = (error as any)?.code;
+    if (storageErrorCode === 'storage/object-not-found') {
+      console.warn(`Image not found in storage (may have already been deleted): ${imageUrl}`);
+    } else {
+      console.warn(`Error deleting image ${imageUrl} from storage:`, error);
     }
-    // Fallback for generic errors
-    throw new Error(`Failed to fetch product ${productId}. Original error: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
 
-/**
- * Uploads an image file to Firebase Storage.
- * @param file The image file to upload.
- * @returns Promise<string> The download URL of the uploaded image.
- * @throws Throws an error if upload fails.
- */
-async function uploadImage(file: File): Promise<string> {
-    const storageRef = ref(storage, `products/${Date.now()}_${file.name}`);
+export async function getProducts(): Promise<Product[]> {
+    try {
+        const productsCollection = collection(db, 'products');
+        const q = query(productsCollection, orderBy('updatedAt', 'desc'));
+        const productSnapshot = await getDocs(q);
+
+        const productList = productSnapshot.docs.map(doc => {
+             const data = doc.data();
+             const product: Product = {
+                id: doc.id,
+                name: data.name || 'Unnamed Product',
+                category: data.category ?? 'Other',
+                subCategory: data.subCategory ?? 'Miscellaneous',
+                description: data.description || 'No description available.',
+                price: typeof data.price === 'number' ? data.price : 0,
+                primaryImageUrl: data.primaryImageUrl || DEFAULT_PRIMARY_IMAGE_URL,
+                imageUrls: Array.isArray(data.imageUrls) ? data.imageUrls : [],
+                quantity: Number(data.quantity) || 0,
+                isBestSeller: data.isBestSeller || false,
+                createdAt: serializeTimestamp(data.createdAt),
+                updatedAt: serializeTimestamp(data.updatedAt),
+            };
+            return product;
+        });
+
+        return productList;
+    } catch (error) {
+        console.warn("Warning during fetching products from Firestore: ", error);
+        if (error instanceof FirestoreError) {
+            console.warn(`Firestore Error Code: ${error.code}`);
+             if (error.code === 'failed-precondition' && error.message.includes('index')) {
+                console.warn(`ACTION REQUIRED/INFO: Firestore Index Issue for getProducts query. An index on 'updatedAt' (DESC) is required. Error: ${error.message}. Returning empty list.`);
+             } else if (error.code === 'permission-denied' || error.code === 'unauthenticated') {
+                 console.warn(`Permission issue: ${error.message}. Returning empty list.`);
+             } else {
+                console.warn(`Failed to fetch products due to Firestore error: ${error.message}. Returning empty list.`);
+             }
+        } else {
+            console.warn(`Failed to fetch products. Original error: ${error instanceof Error ? error.message : String(error)}. Returning empty list.`);
+        }
+        return [];
+    }
+}
+
+export async function getBestSellingProducts(): Promise<Product[]> {
+    try {
+        const productsCollection = collection(db, 'products');
+        const q = query(
+            productsCollection,
+            where('isBestSeller', '==', true),
+            orderBy('updatedAt', 'desc')
+        );
+        const productSnapshot = await getDocs(q);
+
+        const productList = productSnapshot.docs.map(doc => {
+            const data = doc.data();
+            const product: Product = {
+                id: doc.id,
+                name: data.name || 'Unnamed Product',
+                category: data.category ?? 'Other',
+                subCategory: data.subCategory ?? 'Miscellaneous',
+                description: data.description || 'No description available.',
+                price: typeof data.price === 'number' ? data.price : 0,
+                primaryImageUrl: data.primaryImageUrl || DEFAULT_PRIMARY_IMAGE_URL,
+                imageUrls: Array.isArray(data.imageUrls) ? data.imageUrls : [],
+                quantity: Number(data.quantity) || 0,
+                isBestSeller: true, // We know this is true from the query
+                createdAt: serializeTimestamp(data.createdAt),
+                updatedAt: serializeTimestamp(data.updatedAt),
+            };
+            return product;
+        });
+
+        return productList;
+    } catch (error) {
+        console.warn("Warning during fetching best selling products: ", error);
+        if (error instanceof FirestoreError) {
+            console.warn(`Firestore Error Code: ${error.code}`);
+            if (error.code === 'failed-precondition' && error.message.includes('index')) {
+                console.warn(`ACTION REQUIRED/INFO: Firestore Index Issue for getBestSellingProducts. An index on 'isBestSeller' (==) and 'updatedAt' (DESC) is required. Error: ${error.message}. Returning empty list.`);
+            } else {
+                console.warn(`Failed to fetch best selling products due to Firestore error: ${error.message}. Returning empty list.`);
+            }
+        } else {
+            console.warn(`Failed to fetch best selling products. Original error: ${error instanceof Error ? error.message : String(error)}. Returning empty list.`);
+        }
+        return [];
+    }
+}
+
+
+export async function getMostRecentProduct(): Promise<Product | null> {
+    try {
+        const productsCollection = collection(db, 'products');
+        const q = query(
+            productsCollection,
+            orderBy('updatedAt', 'desc'),
+            orderBy('createdAt', 'desc'),
+            limit(1)
+        );
+        const productSnapshot = await getDocs(q);
+        if (productSnapshot.empty) return null;
+
+        const doc = productSnapshot.docs[0];
+        const data = doc.data();
+        return {
+            id: doc.id,
+            name: data.name || 'Unnamed Product',
+            category: data.category ?? 'Other',
+            subCategory: data.subCategory ?? 'Miscellaneous',
+            description: data.description || 'No description',
+            price: typeof data.price === 'number' ? data.price : 0,
+            primaryImageUrl: data.primaryImageUrl || DEFAULT_PRIMARY_IMAGE_URL,
+            imageUrls: Array.isArray(data.imageUrls) ? data.imageUrls : [],
+            quantity: Number(data.quantity) || 0,
+            isBestSeller: data.isBestSeller || false,
+            createdAt: serializeTimestamp(data.createdAt),
+            updatedAt: serializeTimestamp(data.updatedAt),
+        };
+    } catch (error) {
+        console.warn("Warning during fetching the most recent product: ", error);
+        if (error instanceof FirestoreError) {
+            console.warn(`Firestore Error Code: ${error.code}`);
+             if (error.code === 'failed-precondition' && error.message.includes('index')) {
+                 const indexCreationMessage = `ACTION REQUIRED/INFO: Firestore Index Issue for Recent Products Query. Fields: updatedAt (DESC), createdAt (DESC). Status: ${error.message.includes('currently building') ? 'BUILDING' : 'MISSING/MISCONFIGURED'}. Error: ${error.message}. Returning null.`;
+                 console.warn(indexCreationMessage);
+             } else {
+                 console.warn(`Failed to fetch recent product due to Firestore error: ${error.message}. Returning null.`);
+             }
+        } else {
+          console.warn(`Failed to fetch recent product. Original error: ${error instanceof Error ? error.message : String(error)}. Returning null.`);
+        }
+        return null;
+    }
+}
+
+export async function getProductById(productId: string): Promise<Product | null> {
+  try {
+    const productDocRef = doc(db, 'products', productId);
+    const productDoc = await getDoc(productDocRef);
+    if (!productDoc.exists()) return null;
+
+    const data = productDoc.data();
+    return {
+      id: productDoc.id,
+      name: data.name || 'Unnamed Product',
+      category: data.category ?? 'Other',
+      subCategory: data.subCategory ?? 'Miscellaneous',
+      description: data.description || 'No description',
+      price: typeof data.price === 'number' ? data.price : 0,
+      primaryImageUrl: data.primaryImageUrl || DEFAULT_PRIMARY_IMAGE_URL,
+      imageUrls: Array.isArray(data.imageUrls) ? data.imageUrls : [],
+      quantity: Number(data.quantity) || 0,
+      isBestSeller: data.isBestSeller || false,
+      createdAt: serializeTimestamp(data.createdAt),
+      updatedAt: serializeTimestamp(data.updatedAt),
+    };
+  } catch (error) {
+    console.warn(`Warning during fetching product with ID ${productId}: `, error);
+    if (error instanceof FirestoreError) {
+      console.warn(`Firestore Error Code: ${error.code}`);
+    } else {
+      console.warn(`Failed to fetch product ${productId}. Original error: ${error instanceof Error ? error.message : String(error)}.`);
+    }
+    return null;
+  }
+}
+
+async function uploadImage(file: File, productId?: string): Promise<string> {
+    const uniqueFileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+    const storagePath = productId ? `products/${productId}/${uniqueFileName}` : `products/temp/${uniqueFileName}`;
+    const storageRef = ref(storage, storagePath);
     try {
         const snapshot = await uploadBytes(storageRef, file);
-        const downloadURL = await getDownloadURL(snapshot.ref);
-        console.log('File available at', downloadURL);
-        return downloadURL;
+        return await getDownloadURL(snapshot.ref);
     } catch (error) {
         console.error("Error uploading image: ", error);
-        // Add more details if storage error
         if (error instanceof Error && 'code' in error) {
-             const storageErrorCode = (error as any).code; // Firebase storage errors often have a code property
+             const storageErrorCode = (error as any).code;
              console.error(`Firebase Storage Error Code: ${storageErrorCode}`);
-             if (storageErrorCode === 'storage/unauthorized') {
-                 throw new Error("Permission denied for image upload. Check Storage security rules.");
+             if (storageErrorCode === 'storage/unauthorized' || storageErrorCode === 'storage/unauthenticated') {
+                 throw new Error("Permission denied for image upload. Please ensure you are logged in and check Firebase Storage security rules to allow writes to the 'products/' path for authenticated users.");
              }
              throw new Error(`Image upload failed due to Storage error: ${storageErrorCode}`);
         }
@@ -290,156 +289,196 @@ async function uploadImage(file: File): Promise<string> {
     }
 }
 
-/**
- * Adds a new product to the Firestore 'products' collection.
- * Uploads an image if provided, otherwise uses a default image.
- * Includes 'createdAt' and 'updatedAt' timestamps.
- * Includes category and subCategory.
- * @param productData The data for the new product, including an optional image file.
- * @returns Promise<string> The ID of the newly added product document.
- */
 export async function addProduct(productData: AddProductData): Promise<string> {
-    let imageUrl = DEFAULT_IMAGE_URL;
+    let uploadedImageUrls: string[] = [];
+    let primaryImgUrl = DEFAULT_PRIMARY_IMAGE_URL;
 
-    // Validate category and subCategory
     const validCategories = getMainCategories();
     if (!validCategories.includes(productData.category as any)) {
         throw new Error(`Invalid category provided: ${productData.category}`);
     }
     const validSubCategories = getSubCategories(productData.category as any);
-    if (!validSubCategories.includes(productData.subCategory as any)) {
+    if (productData.subCategory && !validSubCategories.includes(productData.subCategory as any)) {
         throw new Error(`Invalid subCategory "${productData.subCategory}" for category "${productData.category}"`);
     }
 
 
-    // Upload image if provided
-    if (productData.imageFile) {
+    if (productData.imageFiles && productData.imageFiles.length > 0) {
         try {
-            imageUrl = await uploadImage(productData.imageFile);
+            for (const file of productData.imageFiles) {
+                const url = await uploadImage(file); // Temp upload path initially
+                uploadedImageUrls.push(url);
+            }
+            if (uploadedImageUrls.length > 0) {
+                const pIndex = productData.primaryImageIndex ?? 0;
+                if (pIndex >= 0 && pIndex < uploadedImageUrls.length) {
+                    primaryImgUrl = uploadedImageUrls[pIndex];
+                    // Ensure primary is first in the array
+                    const otherImageUrls = uploadedImageUrls.filter((_, i) => i !== pIndex);
+                    uploadedImageUrls = [primaryImgUrl, ...otherImageUrls];
+                } else { 
+                    primaryImgUrl = uploadedImageUrls[0];
+                }
+            }
         } catch (error) {
-            console.error("Image upload failed, using default image.", error);
-            // Re-throw the specific upload error to inform the user
-            if (error instanceof Error) throw error;
-            throw new Error("Image upload failed unexpectedly.");
+            console.error("One or more image uploads failed:", error);
+            // Cleanup already uploaded temp images if any error
+            for (const url of uploadedImageUrls) await deleteImageFromStorage(url);
+            if (error instanceof Error) throw error; // Re-throw the specific upload error
+            throw new Error("Image upload process failed.");
         }
+    } else {
+        throw new Error("At least one image is required to add a product.");
     }
 
-    const { imageFile, ...dataToSave } = productData; // Exclude imageFile from Firestore data
-    const now = serverTimestamp(); // Get the server timestamp
+    const { imageFiles, primaryImageIndex, ...dataToSave } = productData;
+    const now = serverTimestamp();
+    let docId = '';
 
     try {
         const productsCollection = collection(db, 'products');
         const docRef = await addDoc(productsCollection, {
             ...dataToSave,
-            imageUrl: imageUrl, // Add the final image URL
-            createdAt: now, // Add creation timestamp
-            updatedAt: now, // Initialize update timestamp
+            primaryImageUrl: primaryImgUrl, // Will be updated if images were temp
+            imageUrls: uploadedImageUrls, // Will be updated if images were temp
+            isBestSeller: false, // Default to false on creation
+            createdAt: now,
+            updatedAt: now,
         });
-        console.log("Product added with ID: ", docRef.id);
-        return docRef.id;
+        docId = docRef.id;
+
+        // If images were uploaded to a temp path, move/rename them to the final path with productId
+        // For simplicity, this example re-uploads. A real scenario might use move/copy operations if available or re-upload.
+        // Here, we assume the current uploadedImageUrls and primaryImgUrl are used as is.
+
+        return docId;
     } catch (error) {
         console.error("Error adding product to Firestore: ", error);
+         // If Firestore fails, try to delete any images that were uploaded
+        for (const url of uploadedImageUrls) await deleteImageFromStorage(url);
+
          if (error instanceof FirestoreError) {
             console.error(`Firestore Error Code: ${error.code}`);
             if (error.code === 'permission-denied') {
-                 throw new Error("Permission denied when adding product. Check Firestore security rules.");
+                 throw new Error("Permission denied when adding product. Check Firestore security rules and ensure you are logged in.");
              } else if (error.code === 'unauthenticated') {
                  throw new Error("User is unauthenticated. Cannot add product.");
              }
-            throw new Error(`Failed to add product due to Firestore error: ${error.message}`);
+            throw new Error(`Failed to add product to Firestore due to error: ${error.message}`);
         }
-        // Fallback for generic errors
-        throw new Error(`Failed to add product. Original error: ${error instanceof Error ? error.message : String(error)}`);
+        const originalErrorMessage = error instanceof Error ? error.message : String(error);
+        throw new Error(`Failed to add product. Original error: ${originalErrorMessage}`);
     }
 }
 
-/**
- * Updates an existing product in the Firestore 'products' collection.
- * Optionally uploads a new image if provided.
- * Updates the 'updatedAt' timestamp.
- * Validates category and subCategory if they are being updated.
- * @param productId The ID of the product to update.
- * @param productData The data to update, including an optional new image file.
- * @returns Promise<void>
- */
 export async function updateProduct(productId: string, productData: UpdateProductData): Promise<void> {
-     let imageUrl: string | undefined = undefined;
-
-     // Validate category/subCategory if they are part of the update
-     if (productData.category !== undefined) {
-        const validCategories = getMainCategories();
-        if (!validCategories.includes(productData.category as any)) {
-            throw new Error(`Invalid category provided for update: ${productData.category}`);
-        }
-         // If category is updated, subCategory MUST also be provided and valid for the NEW category
-         if (productData.subCategory !== undefined) {
-             const validSubCategories = getSubCategories(productData.category as any);
-             if (!validSubCategories.includes(productData.subCategory as any)) {
-                throw new Error(`Invalid subCategory "${productData.subCategory}" for updated category "${productData.category}"`);
-             }
-         } else {
-             // Fetch current product to check its subCategory if only category is changing
-             // This scenario might need more specific handling depending on requirements
-             // For now, we'll assume if category changes, subCategory should be specified
-             console.warn("Updating category without explicitly setting subCategory. Ensure the new subCategory is provided if needed.");
-             // Alternatively, throw an error:
-             // throw new Error("When updating category, a valid subCategory for the new category must also be provided.");
-         }
-     } else if (productData.subCategory !== undefined) {
-         // If only subCategory is updated, validate it against the *current* category
-         const currentProduct = await getProductById(productId);
-         if (!currentProduct) {
-             throw new Error(`Product with ID ${productId} not found for subCategory validation.`);
-         }
-         const validSubCategories = getSubCategories(currentProduct.category as any);
-         if (!validSubCategories.includes(productData.subCategory as any)) {
-             throw new Error(`Invalid subCategory "${productData.subCategory}" for current category "${currentProduct.category}"`);
-         }
-     }
-
-
-    // Upload new image if provided
-     if (productData.imageFile) {
-        try {
-            imageUrl = await uploadImage(productData.imageFile);
-        } catch (error) {
-            console.error("New image upload failed during update.", error);
-            if (error instanceof Error) throw error; // Re-throw specific upload error
-            throw new Error("New image upload failed unexpectedly during update.");
-         }
+    const currentProduct = await getProductById(productId);
+    if (!currentProduct) {
+        throw new Error(`Product with ID ${productId} not found for update.`);
     }
 
-     const { imageFile, ...dataToUpdate } = productData; // Exclude imageFile from Firestore data
+    const dataToUpdate: { [key: string]: any } = {};
+    let hasChanges = false;
 
-     // Add the new image URL to the update data if it was uploaded
-     if (imageUrl !== undefined) {
-        (dataToUpdate as Partial<Product>).imageUrl = imageUrl;
-     }
+    // Check for changes in standard fields by comparing with currentProduct
+    (Object.keys(productData) as Array<keyof UpdateProductData>).forEach(key => {
+        if (key !== 'imageFiles' && key !== 'newPrimaryImageIndexForUpload' && key !== 'makeExistingImagePrimary') {
+            const formValue = productData[key];
+            const productValue = (currentProduct as any)[key];
+            // Explicitly check boolean `isBestSeller`
+            if (key === 'isBestSeller') {
+                if (formValue !== (productValue || false)) {
+                    dataToUpdate[key] = formValue;
+                    hasChanges = true;
+                }
+            } else if (formValue !== undefined && formValue !== productValue) {
+                dataToUpdate[key] = formValue;
+                hasChanges = true;
+            }
+        }
+    });
 
-     // Remove fields with undefined values, as Firestore doesn't allow them directly in updates
-     Object.keys(dataToUpdate).forEach(key => {
-         const typedKey = key as keyof typeof dataToUpdate;
-         if (dataToUpdate[typedKey] === undefined) {
-             delete dataToUpdate[typedKey];
-         }
-     });
+    const finalCategory = dataToUpdate.category || currentProduct.category;
+    if (finalCategory === 'Custom Prints' && (dataToUpdate.subCategory !== undefined || currentProduct.subCategory)) {
+        if (currentProduct.subCategory) { // Only mark as change if it was previously set
+             dataToUpdate.subCategory = ''; 
+             hasChanges = true;
+        }
+    } else if (dataToUpdate.category !== undefined) { // if category changed, re-validate subCategory
+        const validSubCategories = getSubCategories(finalCategory as Category);
+        const finalSubCategory = dataToUpdate.subCategory === undefined ? currentProduct.subCategory : dataToUpdate.subCategory;
+        if (finalCategory !== 'Custom Prints' && (!finalSubCategory || !validSubCategories.includes(finalSubCategory as any))) {
+             throw new Error(`Invalid subCategory "${finalSubCategory}" for category "${finalCategory}"`);
+        }
+    } else if (dataToUpdate.subCategory !== undefined) { // only subCategory changed
+        const validSubCategories = getSubCategories(finalCategory as Category);
+         if (finalCategory !== 'Custom Prints' && !validSubCategories.includes(dataToUpdate.subCategory as any)) {
+            throw new Error(`Invalid subCategory "${dataToUpdate.subCategory}" for category "${finalCategory}"`);
+        }
+    }
 
 
-     if (Object.keys(dataToUpdate).length === 0 && !imageUrl) { // Check if only image was potentially updated
-        console.log("No data provided for update (excluding image file).");
-         return; // Nothing to update
-     }
+    let newImageUrlsUploaded: string[] = [];
 
+    if (productData.imageFiles) { // New images were uploaded, replace all
+        hasChanges = true;
+        // Delete all old images
+        for (const oldUrl of currentProduct.imageUrls) await deleteImageFromStorage(oldUrl);
+        if (currentProduct.primaryImageUrl !== DEFAULT_PRIMARY_IMAGE_URL && !currentProduct.imageUrls.includes(currentProduct.primaryImageUrl)) {
+             await deleteImageFromStorage(currentProduct.primaryImageUrl);
+        }
+
+        for (const file of productData.imageFiles) {
+            const url = await uploadImage(file, productId);
+            newImageUrlsUploaded.push(url);
+        }
+
+        if (newImageUrlsUploaded.length > 0) {
+            const pIndex = productData.newPrimaryImageIndexForUpload ?? 0;
+            dataToUpdate.primaryImageUrl = (pIndex >=0 && pIndex < newImageUrlsUploaded.length) ? newImageUrlsUploaded[pIndex] : newImageUrlsUploaded[0];
+            
+            const primaryFirstArray = [dataToUpdate.primaryImageUrl];
+            newImageUrlsUploaded.forEach(url => {
+                if (url !== dataToUpdate.primaryImageUrl) primaryFirstArray.push(url);
+            });
+            dataToUpdate.imageUrls = primaryFirstArray;
+        } else { // Should not happen if form validates min 1 image for new uploads
+            dataToUpdate.primaryImageUrl = DEFAULT_PRIMARY_IMAGE_URL;
+            dataToUpdate.imageUrls = [];
+        }
+    } else if (productData.imageFiles === null) { // Explicitly remove all images
+        hasChanges = true;
+        for (const oldUrl of currentProduct.imageUrls) await deleteImageFromStorage(oldUrl);
+         if (currentProduct.primaryImageUrl !== DEFAULT_PRIMARY_IMAGE_URL && !currentProduct.imageUrls.includes(currentProduct.primaryImageUrl)) {
+             await deleteImageFromStorage(currentProduct.primaryImageUrl);
+        }
+        dataToUpdate.primaryImageUrl = DEFAULT_PRIMARY_IMAGE_URL;
+        dataToUpdate.imageUrls = [];
+    } else if (productData.makeExistingImagePrimary && productData.makeExistingImagePrimary !== currentProduct.primaryImageUrl) {
+        hasChanges = true;
+        // Reorder existing images
+        dataToUpdate.primaryImageUrl = productData.makeExistingImagePrimary;
+        const reorderedUrls = [productData.makeExistingImagePrimary];
+        currentProduct.imageUrls.forEach(url => {
+            if (url !== productData.makeExistingImagePrimary) reorderedUrls.push(url);
+        });
+        dataToUpdate.imageUrls = reorderedUrls;
+    }
+
+    if (!hasChanges) {
+        return; // No actual changes to save
+    }
+
+    dataToUpdate.updatedAt = serverTimestamp();
 
     try {
         const productDoc = doc(db, 'products', productId);
-        await updateDoc(productDoc, {
-             ...dataToUpdate,
-             updatedAt: serverTimestamp(), // Update the timestamp
-        });
-        console.log("Product updated with ID: ", productId);
+        await updateDoc(productDoc, dataToUpdate);
     } catch (error) {
         console.error("Error updating product in Firestore: ", error);
+        // If update fails, try to delete newly uploaded images (if any)
+        for (const url of newImageUrlsUploaded) await deleteImageFromStorage(url);
+
          if (error instanceof FirestoreError) {
             console.error(`Firestore Error Code: ${error.code}`);
             if (error.code === 'permission-denied') {
@@ -449,22 +488,267 @@ export async function updateProduct(productId: string, productData: UpdateProduc
              }
             throw new Error(`Failed to update product due to Firestore error: ${error.message}`);
         }
-        // Fallback for generic errors
-        throw new Error(`Failed to update product. Original error: ${error instanceof Error ? error.message : String(error)}`);
+        const originalErrorMessage = error instanceof Error ? error.message : String(error);
+        throw new Error(`Failed to update product. Original error: ${originalErrorMessage}`);
     }
 }
 
-// Placeholder for deleteProduct function if needed in the future
-// import { deleteDoc } from 'firebase/firestore';
-// export async function deleteProduct(productId: string): Promise<void> {
-//     try {
-//         const productDoc = doc(db, 'products', productId);
-//         await deleteDoc(productDoc);
-//         console.log("Product deleted with ID: ", productId);
-//         // Optionally delete the associated image from storage here
-//     } catch (error) {
-//         console.error("Error deleting product: ", error);
-//         throw new Error("Failed to delete product.");
-//     }
-// }
 
+export async function deleteProduct(productId: string): Promise<void> {
+    const productDocRef = doc(db, 'products', productId);
+    let productToDelete: Product | null = null;
+
+    try {
+        const productDocSnap = await getDoc(productDocRef);
+        if (productDocSnap.exists()) {
+            const data = productDocSnap.data();
+            productToDelete = {
+                id: productDocSnap.id,
+                name: data.name,
+                category: data.category,
+                subCategory: data.subCategory,
+                description: data.description,
+                price: data.price,
+                primaryImageUrl: data.primaryImageUrl || DEFAULT_PRIMARY_IMAGE_URL,
+                imageUrls: Array.isArray(data.imageUrls) ? data.imageUrls : [],
+                quantity: data.quantity,
+                isBestSeller: data.isBestSeller || false,
+                createdAt: serializeTimestamp(data.createdAt),
+                updatedAt: serializeTimestamp(data.updatedAt),
+            };
+        }
+
+        await deleteDoc(productDocRef);
+
+        if (productToDelete) {
+            if (productToDelete.imageUrls.length > 0) {
+                for (const imageUrl of productToDelete.imageUrls) {
+                    await deleteImageFromStorage(imageUrl);
+                }
+            } else if (productToDelete.primaryImageUrl !== DEFAULT_PRIMARY_IMAGE_URL) { // If no array, check primary
+                await deleteImageFromStorage(productToDelete.primaryImageUrl);
+            }
+        }
+
+    } catch (error) {
+        console.error(`Error deleting product ${productId}:`, error);
+        if (error instanceof FirestoreError && error.code === 'permission-denied') {
+            throw new Error("Permission denied when deleting product from Firestore.");
+        }
+        if (error instanceof Error && (error as any).code?.startsWith('storage/')) {
+            const storageErrorCode = (error as any).code;
+             if (storageErrorCode === 'storage/unauthorized' || storageErrorCode === 'storage/unauthenticated') {
+               throw new Error("Permission denied when deleting image from Storage.");
+            } else if (storageErrorCode === 'storage/object-not-found') {
+               console.warn(`Image not found in Storage during deletion for product ${productId}. It may have already been deleted.`);
+            } else {
+                throw new Error(`Failed to delete product image from Storage due to error: ${storageErrorCode}`);
+            }
+        }
+        const originalErrorMessage = error instanceof Error ? error.message : String(error);
+        throw new Error(`Failed to delete product ${productId}. Original error: ${originalErrorMessage}`);
+    }
+}
+
+export async function updateProductBestSellerStatus(productId: string, isBestSeller: boolean): Promise<void> {
+    const productRef = doc(db, 'products', productId);
+    try {
+        await updateDoc(productRef, {
+            isBestSeller: isBestSeller,
+            updatedAt: serverTimestamp(),
+        });
+    } catch (error) {
+        console.error(`Error updating best seller status for product ${productId}:`, error);
+        if (error instanceof FirestoreError) {
+            throw new Error(`Failed to update best seller status: ${error.message}`);
+        }
+        throw new Error("An unexpected error occurred while updating the product.");
+    }
+}
+
+
+export async function recordSaleAndUpdateStock(productId: string, quantitySold: number): Promise<void> {
+  if (quantitySold <= 0) {
+    throw new Error("Quantity sold must be a positive number.");
+  }
+
+  const productRef = doc(db, "products", productId);
+  const salesCollectionRef = collection(db, "sales");
+
+  try {
+    await runTransaction(db, async (transaction) => {
+      const productDoc = await transaction.get(productRef);
+      if (!productDoc.exists()) {
+        throw new Error("Product not found.");
+      }
+
+      const productData = productDoc.data();
+      const currentQuantity = productData.quantity;
+      if (typeof currentQuantity !== 'number') {
+        throw new Error("Product quantity data is invalid.");
+      }
+
+      if (currentQuantity < quantitySold) {
+        throw new Error(`Insufficient stock. Only ${currentQuantity} available.`);
+      }
+
+      const newQuantity = currentQuantity - quantitySold;
+      transaction.update(productRef, {
+        quantity: newQuantity,
+        updatedAt: serverTimestamp(),
+      });
+
+      const saleData: Omit<SaleRecord, 'id' | 'saleTimestamp'> = {
+        productId: productId,
+        productName: productData.name || 'Unknown Product',
+        quantitySold: quantitySold,
+        salePricePerUnit: productData.price || 0,
+        totalSaleAmount: (productData.price || 0) * quantitySold,
+      };
+      transaction.set(doc(salesCollectionRef), {
+        ...saleData,
+        saleTimestamp: serverTimestamp()
+      });
+    });
+  } catch (error) {
+    console.error(`Error recording sale for product ${productId}:`, error);
+    if (error instanceof FirestoreError || error instanceof Error) {
+      throw new Error(`Failed to record sale: ${error.message}`);
+    }
+    throw new Error("An unexpected error occurred while recording the sale.");
+  }
+}
+
+
+export async function getTodaysSalesSummary(): Promise<TodaysSalesSummary> {
+  const today = new Date();
+  const startOfToday = new Date(today.setHours(0, 0, 0, 0));
+  const endOfToday = new Date(today.setHours(23, 59, 59, 999));
+
+  const salesCollectionRef = collection(db, "sales");
+  const q = query(
+    salesCollectionRef,
+    where("saleTimestamp", ">=", Timestamp.fromDate(startOfToday)),
+    where("saleTimestamp", "<=", Timestamp.fromDate(endOfToday))
+  );
+
+  let ordersToday = 0;
+  let salesTodayAmount = 0;
+
+  try {
+    const querySnapshot = await getDocs(q);
+    ordersToday = querySnapshot.size; 
+    querySnapshot.forEach((doc) => {
+      const sale = doc.data() as SaleRecord;
+      salesTodayAmount += sale.totalSaleAmount || 0;
+    });
+  } catch (error) {
+    console.warn("Warning fetching today's sales summary:", error);
+    if (error instanceof FirestoreError && error.code === 'failed-precondition') {
+        console.warn(`Firestore index likely required for sales query: ${error.message}. Check 'sales' collection for an index on 'saleTimestamp'.`);
+    }
+  }
+  return { ordersToday, salesTodayAmount };
+}
+
+export async function getProductSalesSummary(
+  limitCount: number = 10,
+  startDate?: Date,
+  endDate?: Date
+): Promise<ProductSaleSummary[]> {
+  const salesCollectionRef = collection(db, "sales");
+  let q; 
+
+  const queryConstraints: any[] = [];
+
+  if (startDate) {
+    const startTimestamp = Timestamp.fromDate(new Date(startDate.setHours(0, 0, 0, 0)));
+    queryConstraints.push(where("saleTimestamp", ">=", startTimestamp));
+  }
+  if (endDate) {
+    const endTimestamp = Timestamp.fromDate(new Date(endDate.setHours(23, 59, 59, 999)));
+    queryConstraints.push(where("saleTimestamp", "<=", endTimestamp));
+  }
+  
+  q = query(salesCollectionRef, ...queryConstraints);
+
+
+  let productSales: Record<string, { name: string, totalQuantity: number }> = {};
+
+  try {
+    const salesSnapshot = await getDocs(q);
+    salesSnapshot.forEach((docSnap) => {
+      const sale = docSnap.data() as SaleRecord;
+      if (productSales[sale.productId]) {
+        productSales[sale.productId].totalQuantity += sale.quantitySold;
+      } else {
+        productSales[sale.productId] = {
+          name: sale.productName,
+          totalQuantity: sale.quantitySold,
+        };
+      }
+    });
+
+    return Object.entries(productSales)
+      .map(([productId, data]) => ({
+        productId,
+        productName: data.name,
+        totalQuantitySold: data.totalQuantity,
+      }))
+      .sort((a, b) => b.totalQuantitySold - a.totalQuantitySold)
+      .slice(0, limitCount);
+
+  } catch (error) {
+    console.warn("Warning fetching product sales summary for analytics:", error);
+    if (error instanceof FirestoreError && error.code === 'failed-precondition') {
+        console.warn(`Firestore index likely required for sales query with date range (getProductSalesSummary): ${error.message}. Please ensure an index on 'saleTimestamp' exists.`);
+    }
+    return []; 
+  }
+}
+
+
+export async function getTopSalesByQuantity(
+  limitCount: number = 10,
+  startDate?: Date,
+  endDate?: Date
+): Promise<TopSaleByQuantity[]> {
+  const salesCollectionRef = collection(db, "sales");
+  let q;
+
+  const baseQueryConstraints = [
+    orderBy("quantitySold", "desc"),
+    limit(limitCount),
+  ];
+
+  const dateFilters: any[] = [];
+  if (startDate) {
+    const startTimestamp = Timestamp.fromDate(new Date(startDate.setHours(0, 0, 0, 0)));
+    dateFilters.push(where("saleTimestamp", ">=", startTimestamp));
+  }
+  if (endDate) {
+    const endTimestamp = Timestamp.fromDate(new Date(endDate.setHours(23, 59, 59, 999)));
+    dateFilters.push(where("saleTimestamp", "<=", endTimestamp));
+  }
+
+  q = query(salesCollectionRef, ...dateFilters, ...baseQueryConstraints);
+
+  try {
+    const salesSnapshot = await getDocs(q);
+    return salesSnapshot.docs.map((docSnap) => {
+      const sale = docSnap.data() as SaleRecord;
+      return {
+        id: docSnap.id,
+        productName: sale.productName,
+        quantitySold: sale.quantitySold,
+        saleDate: sale.saleTimestamp instanceof Timestamp ? sale.saleTimestamp.toDate().toLocaleDateString('en-IN') : 'N/A',
+      };
+    });
+  } catch (error) {
+    console.warn("Warning fetching top sales by quantity (getTopSalesByQuantity):", error);
+    if (error instanceof FirestoreError && error.code === 'failed-precondition') {
+        console.warn(`Firestore index likely required for getTopSalesByQuantity query: ${error.message}. Query involves filtering by 'saleTimestamp' and ordering by 'quantitySold'. Ensure an index on (saleTimestamp ASC/DESC, quantitySold DESC) exists.`);
+    }
+    return []; 
+  }
+}

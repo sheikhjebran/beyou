@@ -1,109 +1,229 @@
 
 
-"use client";
-
-import { useState, useEffect } from 'react'; // Kept for potential future use, e.g., dynamic banner content
-// import { ProductGrid } from '@/components/product-grid'; // Removed ProductGrid
-// import type { Product } from '@/types/product'; // Removed Product type
-// import { getProducts } from '@/services/productService'; // Removed product service
 import { Header } from '@/components/header';
-import Image from 'next/image';
-import { Skeleton } from '@/components/ui/skeleton'; // Keep Skeleton for potential loading states if needed
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; // Keep Alert for potential errors
-import { AlertCircle, Tag } from 'lucide-react'; // Added Tag icon for categories
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"; // Keep Card components
-import Link from 'next/link'; // Keep Link
-import { getMainCategories } from '@/lib/categories'; // Import category helper
+import { Footer } from '@/components/footer';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle, Tag, PackageSearch, Star } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import Link from 'next/link';
+import { getMainCategories as getAllMainCategories } from '@/lib/categories';
+import ImageSlider from '@/components/image-slider';
+import { getBanners, type Banner } from '@/services/bannerService';
+import { getBestSellingProducts } from '@/services/productService';
+import { getCategoryImage, type CategoryImageData } from '@/services/categoryImageService';
+import { LoadingImage } from '@/components/loading-image';
+import { ProductCard } from '@/components/product-card';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import { HomepageMobileSearch } from '@/components/homepage-mobile-search';
 
-export default function Home() {
-  const [searchTerm, setSearchTerm] = useState('');
-  // Removed product-related state: products, loading, error
 
-  // Removed useEffect hook for fetching products
+interface SliderImage {
+  src: string;
+  alt: string;
+  title?: string;
+  subtitle?: string;
+  dataAiHint?: string;
+  priority?: boolean;
+}
 
-  // Removed product filtering logic
+interface CategoryWithImage {
+  name: string;
+  customImageUrl?: string | null;
+}
 
-  const categories = getMainCategories(); // Get category list
+async function getHomepageData() {
+  const bannersPromise = getBanners();
+  const bestSellingProductsPromise = getBestSellingProducts();
+  const mainCategories = getAllMainCategories();
+
+  const categoriesDataPromises = mainCategories.map(async (catName) => {
+    const imageData: CategoryImageData | null = await getCategoryImage(catName);
+    return {
+      name: catName,
+      customImageUrl: imageData?.imageUrl || null,
+    };
+  });
+
+  try {
+    const [fetchedBanners, bestSellingProducts, resolvedCategoriesData] = await Promise.all([
+      bannersPromise,
+      bestSellingProductsPromise,
+      Promise.all(categoriesDataPromises)
+    ]);
+
+    // Process Banners
+    let dynamicBanners: SliderImage[];
+    if (fetchedBanners.length > 0) {
+      dynamicBanners = fetchedBanners.map((banner, index) => ({
+        src: banner.imageUrl,
+        alt: banner.title || 'Homepage banner image',
+        title: banner.title,
+        subtitle: banner.subtitle,
+        dataAiHint: 'homepage banner visual',
+        priority: index === 0,
+      }));
+    } else {
+      dynamicBanners = [{
+        src: 'https://placehold.co/1200x500.png',
+        alt: 'Default banner',
+        title: 'Welcome to BeYou',
+        subtitle: 'Explore our latest collections.',
+        dataAiHint: 'storefront welcome',
+        priority: true,
+      }];
+    }
+
+    return {
+      dynamicBanners,
+      bestSellingProducts,
+      categoriesWithImages: resolvedCategoriesData,
+      bannerError: null,
+      productError: null,
+      categoryFetchError: null,
+    };
+
+  } catch (error) {
+    console.error("Failed to fetch homepage data:", error);
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+    
+    // Return a default state on error so the page can still render
+    return {
+      dynamicBanners: [{
+        src: 'https://placehold.co/1200x500.png',
+        alt: 'Error loading banner',
+        title: 'Banners Unavailable',
+        subtitle: 'Please check back later.',
+        dataAiHint: 'placeholder error',
+        priority: true,
+      }],
+      bestSellingProducts: [],
+      categoriesWithImages: getAllMainCategories().map(name => ({ name, customImageUrl: null })),
+      bannerError: errorMessage,
+      productError: errorMessage,
+      categoryFetchError: errorMessage,
+    };
+  }
+}
+
+
+export default async function Home() {
+  const { 
+    dynamicBanners, 
+    bestSellingProducts, 
+    categoriesWithImages, 
+    bannerError, 
+    productError, 
+    categoryFetchError 
+  } = await getHomepageData();
 
   return (
     <div className="flex min-h-screen flex-col">
-      {/* Pass setSearchTerm to Header to enable search functionality */}
-      <Header onSearchChange={setSearchTerm} />
+      <Header />
       <main className="flex-1 container mx-auto">
-        {/* Banner Section */}
-        <section className="relative w-full h-[400px] md:h-[500px] rounded-lg overflow-hidden my-8 shadow-lg">
-          <Image
-            src="https://picsum.photos/seed/herobanner/1200/500"
-            alt="BeYou Banner"
-             fill // Use fill instead of layout
-             style={{ objectFit: 'cover' }} // Add objectFit style
-            priority
-            data-ai-hint="beauty fashion banner"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/30 to-transparent" />
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 text-white">
-            <h1 className="text-4xl md:text-6xl font-bold mb-4 drop-shadow-lg">
-              Discover Your Style
-            </h1>
-            <p className="text-lg md:text-xl mb-8 max-w-2xl drop-shadow-md">
-              Explore our curated collection of the latest trends in beauty and fashion. Find pieces that express your unique elegance.
-            </p>
-          </div>
+        <section className="px-4 pt-4 md:hidden">
+          <HomepageMobileSearch />
         </section>
 
-        {/* Category Grid Section - Replaced Product Grid */}
-        <section id="categories" className="p-6">
+        <section className="relative my-6 md:my-8 h-[250px] sm:h-[400px] md:h-[500px] lg:h-[550px]">
+          {bannerError ? (
+            <Alert variant="destructive" className="h-full flex flex-col justify-center items-center text-center p-4">
+              <AlertCircle className="h-6 w-6 mb-2" />
+              <AlertTitle>Failed to load banners</AlertTitle>
+              <AlertDescription>{bannerError}</AlertDescription>
+            </Alert>
+          ) : (
+            <ImageSlider images={dynamicBanners} className="w-full h-full" />
+          )}
+        </section>
+
+        {/* Best Sellers Section */}
+        <section id="best-sellers" className="py-4 md:py-6">
+            <h2 className="mb-4 text-3xl font-bold tracking-tight text-center text-foreground flex items-center justify-center gap-2">
+                <Star className="text-primary" /> Best Selling Products
+            </h2>
+            {productError ? (
+                <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Error Loading Products</AlertTitle>
+                    <AlertDescription>{productError}</AlertDescription>
+                </Alert>
+            ) : bestSellingProducts.length > 0 ? (
+                <ScrollArea className="w-full whitespace-nowrap rounded-md">
+                  <div className="flex w-max space-x-4 p-4">
+                    {bestSellingProducts.map((product) => (
+                      <div key={product.id} className="w-60 sm:w-64 shrink-0">
+                        <ProductCard product={product} />
+                      </div>
+                    ))}
+                  </div>
+                  <ScrollBar orientation="horizontal" />
+                </ScrollArea>
+            ) : (
+                 <p className="text-center text-muted-foreground">No best sellers featured right now. Check back soon!</p>
+            )}
+        </section>
+        
+        <Separator className="my-8" />
+
+        <section id="categories" className="p-4 md:p-6">
           <h2 className="mb-8 text-3xl font-bold tracking-tight text-center text-foreground">Explore Our Categories</h2>
-
-          {/* Removed product error handling */}
-          {/* Removed product loading skeleton */}
-
-           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-             {categories.map((category) => (
-               <Link key={category} href={`/products?category=${encodeURIComponent(category)}`} passHref legacyBehavior>
-                 <a className="group block"> {/* Make the anchor tag the group */}
-                   <Card className="w-full overflow-hidden rounded-lg shadow-lg transition-transform duration-300 group-hover:scale-105 group-hover:shadow-xl">
-                     <CardHeader className="p-0">
-                       <div className="relative aspect-[4/3] w-full">
-                         <Image
-                           // Using picsum with a seed based on category name for variety
-                           src={`https://picsum.photos/seed/${encodeURIComponent(category)}/400/300`}
-                           alt={`${category} category`}
-                           fill
-                           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                           style={{ objectFit: 'cover' }}
-                           className="transition-opacity duration-300 group-hover:opacity-90"
-                           data-ai-hint={`${category.toLowerCase()} category image`} // AI Hint for images
-                         />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-70 group-hover:opacity-50 transition-opacity duration-300" />
-                       </div>
-                     </CardHeader>
-                     <CardContent className="p-4 bg-card/80 backdrop-blur-sm">
-                       <div className="flex items-center gap-2">
-                         <Tag className="h-5 w-5 text-primary shrink-0" />
-                         <CardTitle className="text-lg font-semibold text-card-foreground truncate group-hover:text-primary transition-colors">
-                           {category}
-                         </CardTitle>
-                       </div>
-                        {/* Optional: Add a short description or sub-category count later */}
-                       {/* <CardDescription className="mt-1 text-sm text-muted-foreground line-clamp-1">
-                         Explore {category} products...
-                       </CardDescription> */}
-                     </CardContent>
-                   </Card>
-                 </a>
-               </Link>
-             ))}
-           </div>
-
-            {/* Removed No Products Message */}
+          {categoryFetchError ? (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error Loading Categories</AlertTitle>
+              <AlertDescription>{categoryFetchError}</AlertDescription>
+            </Alert>
+          ) : categoriesWithImages.length > 0 ? (
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+              {categoriesWithImages.map((category) => (
+                <Link key={category.name} href={`/products?category=${encodeURIComponent(category.name)}`} passHref legacyBehavior>
+                  <a className="group block">
+                    <Card className="w-full overflow-hidden rounded-lg shadow-lg transition-transform duration-300 group-hover:scale-105 group-hover:shadow-xl">
+                      <CardHeader className="p-0">
+                        <div className="relative aspect-[4/3] w-full">
+                          {category.customImageUrl ? (
+                            <LoadingImage
+                              src={category.customImageUrl}
+                              alt={`${category.name} category items display`}
+                              fill
+                              sizes="(max-width: 639px) 45vw, (max-width: 1023px) 30vw, 22vw"
+                              imgClassName="object-cover transition-opacity duration-300 group-hover:opacity-90"
+                              data-ai-hint={`${category.name.toLowerCase().replace(/\s+/g, ' ').split(' ').slice(0,2).join(' ')} product display`}
+                              loadingText="Loading..."
+                            />
+                          ) : (
+                            <div className="flex flex-col items-center justify-center h-full text-center p-4 bg-muted/30">
+                              <PackageSearch className="h-12 w-12 text-muted-foreground mb-2" />
+                              <p className="text-sm font-medium text-muted-foreground">Image Coming Soon</p>
+                              <p className="text-xs text-muted-foreground/80">{category.name}</p>
+                            </div>
+                          )}
+                          {category.customImageUrl && (
+                             <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-70 group-hover:opacity-50 transition-opacity duration-300" />
+                          )}
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-4 bg-card/80 backdrop-blur-sm">
+                        <div className="flex items-center gap-2">
+                          <Tag className="h-5 w-5 text-primary shrink-0" />
+                          <CardTitle className="text-lg font-semibold text-card-foreground truncate group-hover:text-primary transition-colors">
+                            {category.name}
+                          </CardTitle>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </a>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="text-center text-muted-foreground">No categories to display at the moment.</p>
+          )}
         </section>
-
       </main>
-      <footer className="py-6 text-center text-sm text-muted-foreground border-t mt-12">
-        © {new Date().getFullYear()} BeYou. All rights reserved.
-      </footer>
+      <Footer />
     </div>
   );
 }
-

@@ -55,7 +55,6 @@ TableFooter.displayName = "TableFooter"
 const TableRow = React.forwardRef<
   HTMLTableRowElement,
   React.HTMLAttributes<HTMLTableRowElement>
-// Ensure no extraneous whitespace is rendered inside this component
 >(({ className, children, ...props }, ref) => (
   <tr
     ref={ref}
@@ -63,7 +62,10 @@ const TableRow = React.forwardRef<
       "border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted",
       className
     )}
-    {...props}>{children}</tr>
+    {...props}
+  >
+    {children}
+  </tr>
 ));
 TableRow.displayName = "TableRow"
 
@@ -116,5 +118,3 @@ export {
   TableCell,
   TableCaption,
 }
-
-

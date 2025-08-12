@@ -1,29 +1,34 @@
 
 "use client";
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ProductGrid } from '@/components/product-grid';
 import { Header } from '@/components/header';
+import { Footer } from '@/components/footer';
 import type { Product } from '@/types/product';
 import { getProducts } from '@/services/productService';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, Filter } from 'lucide-react';
+import { AlertCircle, Filter, Instagram, Youtube } from 'lucide-react';
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
-import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb"
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
+// Removed: import type { Metadata } from 'next';
 
+// The problematic metadata export has been removed.
+// Page title will be updated by useEffect in ProductsContent.
+// Other SEO metadata for /products should be handled by root layout defaults or other strategies.
 
 function ProductsContent() {
     const searchParams = useSearchParams();
     const category = searchParams.get('category');
     const subCategory = searchParams.get('subCategory');
+    const rawSearchQuery = searchParams.get('q');
 
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    // Fetch products from Firestore on component mount
     useEffect(() => {
         async function loadProducts() {
             setLoading(true);
@@ -32,7 +37,7 @@ function ProductsContent() {
                 const fetchedProducts = await getProducts();
                 setProducts(fetchedProducts);
             } catch (err) {
-                console.error("Failed to load products on products page:", err);
+                console.warn("Failed to load products on products page:", err);
                 setError(err instanceof Error ? err.message : "An unknown error occurred while fetching products.");
             } finally {
                 setLoading(false);
@@ -41,20 +46,49 @@ function ProductsContent() {
         loadProducts();
     }, []);
 
-    // Filter products based on category and sub-category
-    const filteredProducts = products.filter((product: Product) => {
-        if (!category) return true; // Show all if no category filter
-        if (product.category !== category) return false; // Filter by category
-        if (subCategory && product.subCategory !== subCategory) return false; // Filter by sub-category if present
-        return true; // Product matches filters
-    });
+    const normalizedSearchQuery = useMemo(() => {
+        return rawSearchQuery ? rawSearchQuery.trim().toLowerCase() : null;
+    }, [rawSearchQuery]);
 
-    const pageTitle = subCategory ? `${category} > ${subCategory}` : category ? `${category}` : 'All Products';
+    const filteredProducts = useMemo(() => {
+        if (loading) return [];
+
+        const filtered = products.filter((product: Product) => {
+            const matchesCategory = !category || product.category === category;
+            const matchesSubCategory = !subCategory || product.subCategory === subCategory;
+            
+            const matchesSearch = !normalizedSearchQuery ||
+                product.name.toLowerCase().includes(normalizedSearchQuery) ||
+                product.description.toLowerCase().includes(normalizedSearchQuery);
+
+            return matchesCategory && matchesSubCategory && matchesSearch;
+        });
+        
+        // Sort the filtered products to show out-of-stock items last
+        return filtered.sort((a, b) => {
+            const aInStock = a.quantity > 0;
+            const bInStock = b.quantity > 0;
+            if (aInStock && !bInStock) return -1; // a comes first
+            if (!aInStock && bInStock) return 1;  // b comes first
+            return 0; // maintain original order if both are in/out of stock
+        });
+
+    }, [products, category, subCategory, normalizedSearchQuery, loading]);
+
+    const pageTitle = useMemo(() => {
+      if (normalizedSearchQuery) return `Search results for "${rawSearchQuery}"`;
+      if (subCategory) return `${category} > ${subCategory}`;
+      if (category) return `${category}`;
+      return 'All Products';
+    }, [normalizedSearchQuery, rawSearchQuery, category, subCategory]);
+    
+    useEffect(() => {
+        document.title = `${pageTitle} | BeYou`;
+    }, [pageTitle]);
+
 
     return (
         <main className="flex-1 container mx-auto p-6">
-
-             {/* Breadcrumbs and Title */}
              <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                <Breadcrumb>
                  <BreadcrumbList>
@@ -65,7 +99,7 @@ function ProductsContent() {
                    <BreadcrumbItem>
                      <BreadcrumbLink href="/products">Products</BreadcrumbLink>
                    </BreadcrumbItem>
-                   {category && (
+                   {category && !normalizedSearchQuery && ( 
                      <>
                        <BreadcrumbSeparator />
                        <BreadcrumbItem>
@@ -79,13 +113,21 @@ function ProductsContent() {
                        </BreadcrumbItem>
                      </>
                    )}
-                   {subCategory && (
+                   {subCategory && !normalizedSearchQuery && ( 
                      <>
                        <BreadcrumbSeparator />
                        <BreadcrumbItem>
                          <BreadcrumbPage>{subCategory}</BreadcrumbPage>
                        </BreadcrumbItem>
                      </>
+                   )}
+                   {rawSearchQuery && (
+                        <>
+                            <BreadcrumbSeparator />
+                            <BreadcrumbItem>
+                                <BreadcrumbPage>Search</BreadcrumbPage>
+                            </BreadcrumbItem>
+                        </>
                    )}
                  </BreadcrumbList>
                </Breadcrumb>
@@ -94,7 +136,6 @@ function ProductsContent() {
                      {pageTitle}
                  </h1>
              </div>
-
 
             {error && (
                 <Alert variant="destructive" className="mb-8 max-w-2xl mx-auto">
@@ -105,7 +146,6 @@ function ProductsContent() {
             )}
 
             {loading ? (
-                // Skeleton Grid while loading
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {Array.from({ length: 8 }).map((_, index) => (
                         <Card key={`skeleton-card-${index}`} className="w-full max-w-sm overflow-hidden rounded-lg shadow-lg">
@@ -124,12 +164,11 @@ function ProductsContent() {
                     ))}
                 </div>
             ) : (
-                // Actual Product Grid or No Products Message
                 filteredProducts.length > 0 ? (
                     <ProductGrid products={filteredProducts} />
                 ) : (
                     <p className="text-center text-muted-foreground mt-16 text-lg">
-                        No products found matching the selected criteria.
+                        No products found matching your criteria.
                     </p>
                 )
             )}
@@ -137,20 +176,16 @@ function ProductsContent() {
     );
 }
 
-
 export default function ProductsPage() {
   return (
     <div className="flex min-h-screen flex-col">
-      {/* Header without search */}
-      <Header />
-       {/* Wrap ProductsContent in Suspense to handle searchParams */}
-       <Suspense fallback={<div>Loading filters...</div>}>
+      <Header onSearchChange={(term) => {
+          // Navigation is handled by Header's submit function
+      }} />
+       <Suspense fallback={<div className="flex-1 container mx-auto p-6 text-center">Loading filters...</div>}>
          <ProductsContent />
        </Suspense>
-      <footer className="py-6 text-center text-sm text-muted-foreground border-t mt-12">
-        © {new Date().getFullYear()} BeYou. All rights reserved.
-      </footer>
+      <Footer />
     </div>
   );
 }
-

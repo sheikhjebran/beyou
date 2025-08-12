@@ -1,44 +1,76 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // Added useEffect
 import { useRouter } from 'next/navigation';
+import { useForm, SubmitHandler } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle } from 'lucide-react';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { AlertCircle, Instagram, Youtube, Loader2 } from 'lucide-react';
 import Link from 'next/link';
-import { Header } from '@/components/header'; // Import Header
+import { Header } from '@/components/header';
+import { Footer } from '@/components/footer';
+import { signInWithEmailPassword } from '@/services/authService';
+import { useToast } from "@/hooks/use-toast";
+
+const loginFormSchema = z.object({
+  email: z.string().email({ message: "Please enter a valid email address." }),
+  password: z.string().min(6, { message: "Password must be at least 6 characters." }),
+});
+
+type LoginFormValues = z.infer<typeof loginFormSchema>;
 
 export default function LoginPage() {
-  const [loginCode, setLoginCode] = useState(''); // Changed state variable name
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const { toast } = useToast();
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null); // Clear previous errors
+  useEffect(() => {
+    document.title = "Admin Login | BeYou";
+  }, []);
 
-    // Basic Authentication Check (Insecure - for MVP only)
-    if (loginCode === 'ayesha') { // Check against the login code
-      // In a real app, you'd set a session/token here
-      console.log('Admin Login Successful'); // Placeholder
-      router.push('/admin'); // Redirect to a future admin dashboard
-    } else {
-      setError('Invalid login code. Please try again.'); // Updated error message
+  const form = useForm<LoginFormValues>({
+    resolver: zodResolver(loginFormSchema),
+    defaultValues: {
+      email: '',
+      password: '',
+    },
+  });
+
+  const onSubmit: SubmitHandler<LoginFormValues> = async (data) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      await signInWithEmailPassword(data.email, data.password);
+      toast({
+        title: "Login Successful",
+        description: "Welcome back!",
+      });
+      router.push('/admin'); 
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred.";
+      setError(errorMessage); 
+      console.error("Login failed:", errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
     <div className="flex min-h-screen flex-col">
-       <Header /> {/* Add Header */}
+       <Header />
        <main className="flex flex-1 items-center justify-center bg-secondary p-4">
           <Card className="w-full max-w-md shadow-xl">
             <CardHeader className="text-center">
               <CardTitle className="text-2xl font-bold text-primary">Admin Login</CardTitle>
-              <CardDescription>Enter your code to access the admin area.</CardDescription> {/* Updated description */}
+              <CardDescription>Enter your credentials to access the admin area.</CardDescription>
             </CardHeader>
             <CardContent>
               {error && (
@@ -48,38 +80,55 @@ export default function LoginPage() {
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="loginCode">Admin Login code</Label> {/* Changed label text and htmlFor */}
-                  <Input
-                    id="loginCode" // Changed input id
-                    type="password" // Changed input type to password
-                    placeholder="enter password" // Changed placeholder text
-                    value={loginCode}
-                    onChange={(e) => setLoginCode(e.target.value)}
-                    required
-                    aria-describedby={error ? "error-message" : undefined}
-                    aria-invalid={!!error}
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="admin@example.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                  {error && <p id="error-message" className="text-sm text-destructive">{error}</p>}
-                </div>
-                <Button type="submit" className="w-full" suppressHydrationWarning>
-                  Login
-                </Button>
-              </form>
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Password</FormLabel>
+                        <FormControl>
+                          <Input type="password" placeholder="••••••••" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <Button type="submit" className="w-full" disabled={isLoading} suppressHydrationWarning>
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Logging in...
+                      </>
+                    ) : (
+                      'Login'
+                    )}
+                  </Button>
+                </form>
+              </Form>
                <div className="mt-4 text-center text-sm">
                  <Link href="/" className="underline text-muted-foreground hover:text-primary">
                    Back to Shop
                  </Link>
-              </div>
+               </div>
             </CardContent>
           </Card>
        </main>
-        {/* Optional Footer */}
-         <footer className="py-6 text-center text-sm text-muted-foreground border-t mt-12 bg-background">
-            © {new Date().getFullYear()} BeYou. All rights reserved.
-          </footer>
+       <Footer />
     </div>
   );
 }
-

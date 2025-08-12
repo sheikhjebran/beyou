@@ -4,23 +4,18 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAnalytics, isSupported } from "firebase/analytics";
 import { getFirestore } from "firebase/firestore"; // Import Firestore
 import { getStorage } from "firebase/storage"; // Import Storage
-
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
+import { getAuth } from "firebase/auth"; // Import Auth
 
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-// IMPORTANT: In a real application, store these values in environment variables
-// (e.g., .env.local) and access them via process.env.NEXT_PUBLIC_FIREBASE_*,
-// never hardcode them directly in the source code.
 const firebaseConfig = {
-    apiKey: "AIzaSyBIcJ6DXZlvbBDey7CuIQmDSTJrgRL01Qg",
-    authDomain: "beyou-f9842.firebaseapp.com",
-    projectId: "beyou-f9842",
-    storageBucket: "beyou-f9842.appspot.com", // Keep the .appspot.com for storage bucket reference
-    messagingSenderId: "905906146458",
-    appId: "1:905906146458:web:7949f115a605ba793b6323",
-    measurementId: "G-JWNJ9W854M"
+  apiKey: "AIzaSyBeB_8XQV8NWFqA-Rvnn6aIKT7O_RSpFG8",
+  authDomain: "elegance-boutique-m9ypf.firebaseapp.com",
+  projectId: "elegance-boutique-m9ypf",
+  storageBucket: "elegance-boutique-m9ypf.firebasestorage.app", // Using the .firebasestorage.app suffix as per last user input
+  messagingSenderId: "589129954169",
+  appId: "1:589129954169:web:aa66535b2a0672ab8135a8",
+  measurementId: "G-B2YZX33FLQ"
 };
 
 
@@ -42,9 +37,10 @@ if (typeof window !== 'undefined') {
   });
 }
 
-// Initialize Firestore and Storage
+// Initialize Firestore, Storage, and Auth
 const db = getFirestore(app);
-const storage = getStorage(app);
+const storage = getStorage(app); // storage instance will use the firebaseConfig above
+const auth = getAuth(app);
 
 
-export { app, analytics, db, storage }; // Export the initialized app, analytics, db, and storage instances
+export { app, analytics, db, storage, auth }; // Export the initialized instances

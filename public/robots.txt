@@ -1,0 +1,13 @@
+
+# robots.txt for BeYou
+
+User-agent: *
+Allow: /
+
+# Disallow admin and auth related paths if they shouldn't be indexed
+Disallow: /admin/
+Disallow: /login/
+Disallow: /signup/
+
+# Path to sitemap (ensure you generate and place sitemap.xml here)
+Sitemap: https://beyoushop.in/sitemap.xml

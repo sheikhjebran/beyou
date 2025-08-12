@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react'; // Added useEffect
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -14,27 +14,50 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from "@/hooks/use-toast";
-import { addProduct, type AddProductData } from '@/services/productService'; // Import service
-import { Loader2, ArrowLeft } from 'lucide-react';
+import { addProduct, type AddProductData } from '@/services/productService';
+import { Loader2, ArrowLeft, AlertCircle, UploadCloud, XCircle } from 'lucide-react';
 import Link from 'next/link';
-import { getMainCategories, getSubCategories, type Category } from '@/lib/categories'; // Import category helpers
+import { getMainCategories, getSubCategories, type Category } from '@/lib/categories';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import Image from 'next/image';
+import { Badge } from '@/components/ui/badge';
 
+const MAX_FILES = 5;
+const MAX_FILE_SIZE_MB = 5;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
-// Define Zod schema for validation including categories
 const productFormSchema = z.object({
   name: z.string().min(3, { message: "Product name must be at least 3 characters." }),
-  type: z.enum(['Beauty', 'Clothing'], { required_error: "Please select a product type." }), // Keep if still relevant for broad filtering
-  category: z.string().min(1, { message: "Please select a category." }), // Main category
-  subCategory: z.string().min(1, { message: "Please select a sub-category." }), // Sub category
+  category: z.string().min(1, { message: "Please select a category." }),
+  subCategory: z.string().optional(),
   description: z.string().min(10, { message: "Description must be at least 10 characters." }),
   price: z.coerce.number().min(0.01, { message: "Price must be a positive number." }),
   quantity: z.coerce.number().int().min(0, { message: "Quantity must be a non-negative integer." }),
-  imageFile: z.instanceof(File).optional().nullable()
-     .refine(file => !file || file.size <= 5 * 1024 * 1024, `Max image size is 5MB.`)
-     .refine(
-       file => !file || ["image/jpeg", "image/png", "image/webp"].includes(file.type),
-       "Only .jpg, .png, and .webp formats are supported."
-     ),
+  imageFiles: z.array(z.instanceof(File))
+    .min(1, "Please upload at least one image.") // Ensure at least one image
+    .max(MAX_FILES, `You can upload a maximum of ${MAX_FILES} images.`)
+    .refine(files => files.every(file => file.size <= MAX_FILE_SIZE_BYTES),
+      `Each image size should be less than ${MAX_FILE_SIZE_MB}MB.`)
+    .refine(files => files.every(file => ALLOWED_IMAGE_TYPES.includes(file.type)),
+      `Only .jpg, .png, and .webp formats are supported.`)
+}).refine(data => {
+  if (data.category !== 'Custom Prints') {
+    return data.subCategory && data.subCategory.length > 0;
+  }
+  return true;
+}, {
+  message: "Please select a sub-category.",
+  path: ["subCategory"],
+}).refine(data => {
+  if (data.category !== 'Custom Prints' && data.subCategory) {
+    const validSubCategories = getSubCategories(data.category as Category);
+    return validSubCategories.includes(data.subCategory);
+  }
+  return true;
+}, {
+  message: "Selected sub-category is not valid for the chosen category.",
+  path: ["subCategory"],
 });
 
 type ProductFormValues = z.infer<typeof productFormSchema>;
@@ -43,68 +66,102 @@ export default function AddProductPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [availableSubCategories, setAvailableSubCategories] = useState<string[]>([]); // State for dynamic sub-categories
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const [availableSubCategories, setAvailableSubCategories] = useState<string[]>([]);
+  const [primaryImageIndex, setPrimaryImageIndex] = useState<number>(0);
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
     defaultValues: {
       name: '',
-      type: undefined,
-      category: '', // Initialize category
-      subCategory: '', // Initialize subCategory
+      category: '',
+      subCategory: '',
       description: '',
       price: 0,
       quantity: 0,
-      imageFile: null,
+      imageFiles: [], // Initialize as empty array
     },
   });
 
-  // Watch the 'category' field to update sub-categories
   const selectedCategory = form.watch('category');
 
   useEffect(() => {
     if (selectedCategory) {
-      const subs = getSubCategories(selectedCategory as Category); // Fetch sub-categories
-      setAvailableSubCategories(subs);
-      form.setValue('subCategory', ''); // Reset subCategory when category changes
+      if (selectedCategory === 'Custom Prints') {
+        setAvailableSubCategories([]);
+        form.setValue('subCategory', '', { shouldValidate: true });
+      } else {
+        const subs = getSubCategories(selectedCategory as Category);
+        setAvailableSubCategories(subs);
+        const currentSubCategory = form.getValues('subCategory');
+        if (currentSubCategory && !subs.includes(currentSubCategory)) {
+            form.setValue('subCategory', '', { shouldValidate: true });
+        } else if (!currentSubCategory) {
+             form.setValue('subCategory', '', { shouldValidate: true });
+        }
+      }
     } else {
       setAvailableSubCategories([]);
-      form.setValue('subCategory', ''); // Clear subCategory if no category selected
+      form.setValue('subCategory', '', { shouldValidate: true });
     }
   }, [selectedCategory, form]);
 
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (files) {
+      const filesArray = Array.from(files).slice(0, MAX_FILES);
+      form.setValue('imageFiles', filesArray, { shouldValidate: true });
+      setPrimaryImageIndex(0); // Reset primary to first image
 
-   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-     const file = event.target.files?.[0];
-     if (file) {
-       form.setValue('imageFile', file, { shouldValidate: true });
-       const reader = new FileReader();
-       reader.onloadend = () => {
-         setPreviewUrl(reader.result as string);
-       };
-       reader.readAsDataURL(file);
-     } else {
-       form.setValue('imageFile', null);
-       setPreviewUrl(null);
-     }
-   };
+      const newPreviewUrls: string[] = [];
+      filesArray.forEach(file => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          newPreviewUrls.push(reader.result as string);
+          if (newPreviewUrls.length === filesArray.length) {
+            setPreviewUrls([...newPreviewUrls]);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+      if (filesArray.length === 0) {
+        setPreviewUrls([]);
+      }
+    } else {
+      form.setValue('imageFiles', []);
+      setPreviewUrls([]);
+      setPrimaryImageIndex(0);
+    }
+  };
 
+  const removePreviewImage = (index: number) => {
+    const currentFiles = form.getValues('imageFiles') || [];
+    const updatedFiles = currentFiles.filter((_, i) => i !== index);
+    form.setValue('imageFiles', updatedFiles.length > 0 ? updatedFiles : [], { shouldValidate: true });
+
+    const updatedPreviewUrls = previewUrls.filter((_, i) => i !== index);
+    setPreviewUrls(updatedPreviewUrls);
+
+    if (updatedFiles.length === 0) {
+        setPrimaryImageIndex(0);
+    } else if (index === primaryImageIndex) {
+      setPrimaryImageIndex(0); 
+    } else if (index < primaryImageIndex) {
+      setPrimaryImageIndex(prev => prev - 1);
+    }
+  };
 
   const onSubmit: SubmitHandler<ProductFormValues> = async (data) => {
     setIsSubmitting(true);
-    console.log("Form Data Submitted:", data);
-
-    // Prepare data for the service function
     const productData: AddProductData = {
         name: data.name,
-        type: data.type,
-        category: data.category, // Include category
-        subCategory: data.subCategory, // Include subCategory
+        category: data.category,
+        subCategory: data.category === 'Custom Prints' ? '' : data.subCategory || '',
         description: data.description,
         price: data.price,
         quantity: data.quantity,
-        imageFile: data.imageFile, // Pass the File object
+        imageFiles: data.imageFiles || [],
+        primaryImageIndex: primaryImageIndex,
     };
 
     try {
@@ -113,10 +170,11 @@ export default function AddProductPage() {
         title: "Product Added",
         description: `Product "${data.name}" (ID: ${newProductId}) has been successfully added.`,
       });
-      form.reset(); // Reset form after successful submission
-      setPreviewUrl(null); // Clear image preview
-      setAvailableSubCategories([]); // Clear sub-categories
-      router.push('/admin/inventory'); // Redirect back to inventory list
+      form.reset();
+      setPreviewUrls([]);
+      setAvailableSubCategories([]);
+      setPrimaryImageIndex(0);
+      router.push('/admin/inventory');
     } catch (error) {
        console.error("Error adding product:", error);
        toast({
@@ -144,190 +202,65 @@ export default function AddProductPage() {
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle>Product Details</CardTitle>
-          <CardDescription>Fill in the information for the new product.</CardDescription>
+          <CardDescription>Fill in the information for the new product. Upload at least 1 and up to {MAX_FILES} images. Click an image to mark it as primary.</CardDescription>
         </CardHeader>
         <CardContent>
            <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                 {/* Product Name */}
+                <FormField control={form.control} name="name" render={({ field }) => (<FormItem><FormLabel>Product Name</FormLabel><FormControl><Input placeholder="e.g., Velvet Luxe Lipstick" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="category" render={({ field }) => (<FormItem><FormLabel>Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select main category" /></SelectTrigger></FormControl><SelectContent>{getMainCategories().map((cat) => (<SelectItem key={cat} value={cat}>{cat}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="subCategory" render={({ field }) => (<FormItem><FormLabel>Sub-Category</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={!selectedCategory || selectedCategory === 'Custom Prints' || availableSubCategories.length === 0}><FormControl><SelectTrigger><SelectValue placeholder={selectedCategory === 'Custom Prints' ? "N/A (Custom Prints)" : (selectedCategory ? "Select sub-category" : "Select category first")} /></SelectTrigger></FormControl><SelectContent>{availableSubCategories.map((subCat) => (<SelectItem key={subCat} value={subCat}>{subCat}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel>Description</FormLabel><FormControl><Textarea placeholder="Detailed description of the product..." {...field} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="price" render={({ field }) => (<FormItem><FormLabel>Price (₹)</FormLabel><FormControl><Input type="number" step="0.01" placeholder="e.g., 24.99" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="quantity" render={({ field }) => (<FormItem><FormLabel>Quantity</FormLabel><FormControl><Input type="number" placeholder="e.g., 100" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                
                 <FormField
                   control={form.control}
-                  name="name"
-                  render={({ field }) => (
+                  name="imageFiles"
+                  render={() => (
                     <FormItem>
-                      <FormLabel>Product Name</FormLabel>
+                      <FormLabel>Product Images (Max {MAX_FILES}, up to {MAX_FILE_SIZE_MB}MB each)</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., Velvet Luxe Lipstick" {...field} />
+                        <div className="flex items-center justify-center w-full">
+                          <label htmlFor="imageFiles-input" className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted/70">
+                            <UploadCloud className="w-8 h-8 mb-2 text-muted-foreground" />
+                            <p className="mb-1 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
+                            <p className="text-xs text-muted-foreground">PNG, JPG, WEBP (MAX {MAX_FILE_SIZE_MB}MB each, up to {MAX_FILES} images)</p>
+                            <Input id="imageFiles-input" type="file" accept={ALLOWED_IMAGE_TYPES.join(",")} multiple onChange={handleFileChange} className="hidden" />
+                          </label>
+                        </div>
                       </FormControl>
+                      {previewUrls.length > 0 && (
+                        <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                          {previewUrls.map((url, index) => (
+                            <div key={index} className="relative aspect-square group cursor-pointer" onClick={() => setPrimaryImageIndex(index)}>
+                              <Image src={url} alt={`Preview ${index + 1}`} fill className={`object-cover rounded-md border-2 ${index === primaryImageIndex ? 'border-primary ring-2 ring-primary' : 'border-transparent'}`} />
+                              {index === primaryImageIndex && (
+                                <Badge variant="default" className="absolute top-1 left-1 text-xs z-10">Primary</Badge>
+                              )}
+                              <Button type="button" variant="destructive" size="icon" className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity z-20" onClick={(e) => { e.stopPropagation(); removePreviewImage(index); }}>
+                                <XCircle className="h-4 w-4" />
+                                <span className="sr-only">Remove image {index + 1}</span>
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-
-                 {/* Product Type (keep if used for filtering/display, otherwise optional) */}
-                  <FormField
-                    control={form.control}
-                    name="type"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Product Type (Broad)</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a type (e.g., Beauty, Clothing)" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="Beauty">Beauty</SelectItem>
-                            <SelectItem value="Clothing">Clothing</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                 {/* Main Category Dropdown */}
-                  <FormField
-                    control={form.control}
-                    name="category"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Category</FormLabel>
-                        <Select
-                          onValueChange={(value) => {
-                            field.onChange(value);
-                            // No need to manually call getSubCategories here, useEffect handles it
-                          }}
-                          defaultValue={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select main category" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {getMainCategories().map((cat) => (
-                              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                 {/* Sub-Category Dropdown (Dynamic) */}
-                 <FormField
-                   control={form.control}
-                   name="subCategory"
-                   render={({ field }) => (
-                     <FormItem>
-                       <FormLabel>Sub-Category</FormLabel>
-                       <Select
-                         onValueChange={field.onChange}
-                         value={field.value} // Controlled component
-                         disabled={!selectedCategory || availableSubCategories.length === 0} // Disable if no category or sub-categories
-                       >
-                         <FormControl>
-                           <SelectTrigger>
-                             <SelectValue placeholder={selectedCategory ? "Select sub-category" : "Select category first"} />
-                           </SelectTrigger>
-                         </FormControl>
-                         <SelectContent>
-                           {availableSubCategories.map((subCat) => (
-                             <SelectItem key={subCat} value={subCat}>{subCat}</SelectItem>
-                           ))}
-                         </SelectContent>
-                       </Select>
-                       <FormMessage />
-                     </FormItem>
-                   )}
-                 />
-
-
-                {/* Description */}
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Description</FormLabel>
-                      <FormControl>
-                        <Textarea placeholder="Detailed description of the product..." {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* Price */}
-                <FormField
-                  control={form.control}
-                  name="price"
-                   render={({ field }) => (
-                     <FormItem>
-                       <FormLabel>Price (₹)</FormLabel>
-                       <FormControl>
-                          {/* Ensure input type is number and step allows decimals */}
-                          <Input type="number" step="0.01" placeholder="e.g., 24.99" {...field} />
-                       </FormControl>
-                       <FormMessage />
-                     </FormItem>
-                  )}
-                />
-
-                 {/* Quantity */}
-                 <FormField
-                   control={form.control}
-                   name="quantity"
-                   render={({ field }) => (
-                     <FormItem>
-                       <FormLabel>Quantity</FormLabel>
-                       <FormControl>
-                         <Input type="number" placeholder="e.g., 100" {...field} />
-                       </FormControl>
-                       <FormMessage />
-                     </FormItem>
-                   )}
-                 />
-
-                {/* Image Upload */}
-                 <FormField
-                   control={form.control}
-                   name="imageFile"
-                   render={({ field }) => ( // No need to manage file state separately, RHF handles it
-                     <FormItem>
-                       <FormLabel>Product Image (Optional)</FormLabel>
-                       <FormControl>
-                           <Input
-                              type="file"
-                              accept="image/png, image/jpeg, image/webp"
-                              onChange={handleFileChange} // Use custom handler to update RHF and preview
-                              className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
-                           />
-                       </FormControl>
-                        {previewUrl && (
-                         <div className="mt-4">
-                            <p className="text-sm text-muted-foreground">Image Preview:</p>
-                            <img src={previewUrl} alt="Image preview" className="mt-2 h-32 w-32 object-cover rounded-md border" />
-                         </div>
-                        )}
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-
+                {(!form.formState.isValid && !isSubmitting && (form.formState.isDirty || form.formState.isSubmitted)) && (
+                    <Alert variant="destructive" className="mb-4">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertTitle>Button Disabled</AlertTitle>
+                        <AlertDescription>
+                            The 'Add Product' button is currently disabled. Please ensure all required fields are filled correctly, including uploading at least one image.
+                        </AlertDescription>
+                    </Alert>
+                )}
                  <Button type="submit" disabled={isSubmitting || !form.formState.isValid} className="w-full md:w-auto">
-                   {isSubmitting ? (
-                      <>
-                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Adding Product...
-                     </>
-                    ) : (
-                     'Add Product'
-                   )}
+                   {isSubmitting ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Adding Product...</>) : ('Add Product')}
                  </Button>
               </form>
             </Form>

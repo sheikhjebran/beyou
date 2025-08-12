@@ -1,8 +1,22 @@
 
 import { Header } from '@/components/header';
-import { PackageSearch } from 'lucide-react';
+import { Footer } from '@/components/footer';
+import { PackageSearch, Instagram, Youtube } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Coming Soon - New Arrivals & Features at BeYou',
+  description: 'Exciting new products and features are coming soon to BeYou! Stay tuned for the latest in beauty and fashion.',
+  robots: {
+    index: false, // Typically, "Coming Soon" pages are not indexed
+    follow: true,
+  },
+  alternates: {
+    canonical: '/coming-soon',
+  },
+};
 
 export default function ComingSoonPage() {
   return (
@@ -18,11 +32,7 @@ export default function ComingSoonPage() {
           <Button>Back to Home</Button>
         </Link>
       </main>
-      <footer className="py-6 text-center text-sm text-muted-foreground border-t mt-12">
-        © {new Date().getFullYear()} BeYou. All rights reserved.
-      </footer>
+      <Footer />
     </div>
   );
 }
-
-    
