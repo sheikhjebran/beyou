@@ -1,10 +1,14 @@
-# Firebase Studio
+# BeYou - E-commerce Platform
 
-This is a NextJS starter in Firebase Studio.
+A Next.js-based e-commerce platform with MySQL database.
 
-To get started, take a look at src/app/page.tsx.
+## Getting Started
 
-# to install the package
+First, set up the project:
+
+### Database Setup
+
+The project uses MySQL for data storage. Database migrations are managed through SQL files in the `src/db/migrations` folder.
 ```bash
 npm install
 ```
@@ -13,3 +17,9 @@ npm install
 ```bash
 npm run dev
 ```
+
+Email: admin@beyou.com
+Password: Admin@123
+
+
+npm run migrate

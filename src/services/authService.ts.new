@@ -1,0 +1,85 @@
+'use client'
+
+import { User } from './server/authService';
+import { handleDatabaseResponse } from '@/lib/mysql';
+
+// Sign Up with Email and Password
+export async function signUpWithEmailPassword(email: string, password: string): Promise<User> {
+    const response = await fetch('/api/auth', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            operation: 'signUp',
+            email,
+            password,
+        }),
+    });
+
+    return handleDatabaseResponse<User>(response);
+}
+
+// Sign In with Email and Password
+export async function signInWithEmailPassword(email: string, password: string): Promise<User> {
+    const response = await fetch('/api/auth', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            operation: 'signIn',
+            email,
+            password,
+        }),
+    });
+
+    return handleDatabaseResponse<User>(response);
+}
+
+export async function updateUserProfile(userId: string, data: { displayName?: string, photoFile?: File }): Promise<void> {
+    const formData = new FormData();
+    
+    if (data.displayName !== undefined) {
+        formData.append('displayName', data.displayName);
+    }
+    
+    if (data.photoFile) {
+        formData.append('photoFile', data.photoFile);
+    }
+
+    const response = await fetch(`/api/auth?userId=${userId}`, {
+        method: 'PUT',
+        body: formData,
+    });
+
+    return handleDatabaseResponse<void>(response);
+}
+
+export async function getUserById(userId: string): Promise<User | null> {
+    const response = await fetch(`/api/auth?userId=${userId}`);
+    if (response.status === 404) {
+        return null;
+    }
+    return handleDatabaseResponse<User>(response);
+}
+
+export async function updatePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string
+): Promise<void> {
+    const response = await fetch(`/api/auth?userId=${userId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            operation: 'updatePassword',
+            currentPassword,
+            newPassword,
+        }),
+    });
+
+    return handleDatabaseResponse<void>(response);
+}

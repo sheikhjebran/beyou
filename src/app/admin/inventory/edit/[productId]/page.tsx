@@ -144,7 +144,7 @@ export default function EditProductPage() {
              subCategory: currentProduct.subCategory,
              description: currentProduct.description,
              price: currentProduct.price,
-             quantity: currentProduct.quantity,
+             quantity: currentProduct.stockQuantity,
              isBestSeller: currentProduct.isBestSeller || false,
              imageFiles: null, // Reset file input
            });
@@ -193,7 +193,7 @@ export default function EditProductPage() {
             setNewImagePreviews([...newPreviews]);
             setPrimaryImageMarker(0); // New files uploaded, primary is the first of these by index
             setCurrentImagePreviews([]); // Hide current images as new ones are being staged
-            form.markFieldAsDirty('imageFiles');
+            form.setValue('imageFiles', form.getValues('imageFiles'), { shouldDirty: true });
           }
         };
         reader.readAsDataURL(file);
@@ -207,7 +207,7 @@ export default function EditProductPage() {
         setCurrentImagePreviews(orderedInitialImages);
         setPrimaryImageMarker(productData.primaryImageUrl || (orderedInitialImages.length > 0 ? orderedInitialImages[0] : null));
       }
-      form.markFieldAsDirty('imageFiles'); // Mark as dirty to allow saving "no images"
+      form.setValue('imageFiles', [], { shouldDirty: true }); // Mark as dirty to allow saving "no images"
     }
   };
 
@@ -241,13 +241,13 @@ export default function EditProductPage() {
   const handleExistingImageClick = (url: string) => {
     if (newImagePreviews.length === 0) { // Only allow selecting from existing if no new images are staged
         setPrimaryImageMarker(url);
-        form.markFieldAsDirty('name'); // Trick to enable save button if only primary image changed among existing
+        form.setValue('name', form.getValues('name'), { shouldDirty: true }); // Trick to enable save button if only primary image changed among existing
     }
   };
 
   const handleNewPreviewClick = (index: number) => {
       setPrimaryImageMarker(index);
-      form.markFieldAsDirty('name'); 
+      form.setValue('name', form.getValues('name'), { shouldDirty: true }); 
   }
 
 
@@ -265,7 +265,7 @@ export default function EditProductPage() {
     (Object.keys(values) as Array<keyof ProductFormValues>).forEach(key => {
         if (key !== 'imageFiles' && values[key] !== undefined) {
              const formValue = values[key];
-             const productValue = (productData as any)[key];
+             let productValue = key === 'quantity' ? productData.stockQuantity : (productData as any)[key];
              // Explicitly check boolean `isBestSeller`
              if (key === 'isBestSeller' && formValue !== (productValue || false)) {
                   (dataToUpdate as any)[key] = formValue;
@@ -351,7 +351,7 @@ export default function EditProductPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-4">
-        <Link href="/admin/inventory" passHref legacyBehavior>
+        <Link href="/admin/inventory" className="inline-block">
           <Button variant="outline" size="icon" className="h-8 w-8">
             <ArrowLeft className="h-4 w-4" />
             <span className="sr-only">Back to Inventory</span>

@@ -2,7 +2,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -34,34 +34,23 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import useSWR from 'swr';
+
+const fetcher = async (url: string) => {
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error('Failed to fetch products');
+  }
+  return res.json();
+};
 
 export default function InventoryPage() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: products = [], error, isLoading, mutate } = useSWR<Product[]>('/api/products', fetcher);
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
   const [togglingProductId, setTogglingProductId] = useState<string | null>(null);
   const { toast } = useToast();
   const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
-
-  async function loadProducts() {
-    setLoading(true);
-    setError(null);
-    try {
-      const fetchedProducts = await getProducts();
-      setProducts(fetchedProducts);
-    } catch (err) {
-       console.warn("Failed to load products:", err);
-       setError(err instanceof Error ? err.message : "An unknown error occurred while fetching products.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    loadProducts();
-  }, []);
 
   const openDeleteDialog = (product: Product) => {
     setProductToDelete(product);
@@ -73,10 +62,12 @@ export default function InventoryPage() {
     setTogglingProductId(product.id);
     try {
       await updateProductBestSellerStatus(product.id, newStatus);
-      setProducts(prevProducts =>
-        prevProducts.map(p =>
+      // Optimistically update the UI
+      await mutate(
+        products.map((p: Product) =>
           p.id === product.id ? { ...p, isBestSeller: newStatus } : p
-        )
+        ),
+        false
       );
       toast({
         title: "Status Updated",
@@ -88,12 +79,8 @@ export default function InventoryPage() {
         title: "Update Failed",
         description: err instanceof Error ? err.message : "Could not update best seller status.",
       });
-      // Revert UI on failure
-      setProducts(prevProducts =>
-        prevProducts.map(p =>
-          p.id === product.id ? { ...p, isBestSeller: product.isBestSeller } : p
-        )
-      );
+      // Revert UI on failure by refetching
+      await mutate();
     } finally {
       setTogglingProductId(null);
     }
@@ -108,7 +95,11 @@ export default function InventoryPage() {
 
     try {
       await deleteProductService(productToDelete.id);
-      setProducts(prevProducts => prevProducts.filter(p => p.id !== productToDelete.id));
+      // Optimistically update UI
+      await mutate(
+        products.filter((p: Product) => p.id !== productToDelete.id),
+        false
+      );
       toast({
         title: "Product Deleted",
         description: `Product "${productToDelete.name}" has been successfully deleted.`,
@@ -120,6 +111,8 @@ export default function InventoryPage() {
         title: "Error Deleting Product",
         description: err instanceof Error ? err.message : "An unexpected error occurred.",
       });
+      // Revert UI on failure by refetching
+      await mutate();
     } finally {
       setDeletingProductId(null);
       setProductToDelete(null);
@@ -130,7 +123,7 @@ export default function InventoryPage() {
     <div className="flex flex-col gap-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl md:text-3xl font-bold">Inventory Management</h1>
-         <Link href="/admin/inventory/add" passHref legacyBehavior>
+         <Link href="/admin/inventory/add" className="block">
              <Button>
                  <PlusCircle className="mr-2 h-4 w-4" /> Add Product
              </Button>
@@ -165,7 +158,7 @@ export default function InventoryPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading ? (
+              {isLoading ? (
                   Array.from({ length: 5 }).map((_, index) => (
                      <TableRow key={`skeleton-${index}`}>
                        <TableCell><Skeleton className="h-16 w-16 rounded-md" /></TableCell>
@@ -225,7 +218,7 @@ export default function InventoryPage() {
                     <TableCell className="text-right">{product.quantity ?? 'N/A'}</TableCell>
                     <TableCell className="text-center">
                       <div className="flex justify-center gap-2">
-                        <Link href={`/admin/inventory/edit/${product.id}`} passHref legacyBehavior>
+                        <Link href={`/admin/inventory/edit/${product.id}`} className="inline-block">
                            <Button variant="outline" size="icon" className="h-8 w-8">
                               <Edit className="h-4 w-4" />
                               <span className="sr-only">Edit</span>

@@ -14,7 +14,7 @@ import { Share2, ShoppingBag, Plus, Minus, Info, ChevronLeft, ChevronRight } fro
 import { useCart } from '@/hooks/use-cart';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
-import { LoadingImage } from '@/components/loading-image';
+import LoadingImage from '@/components/loading-image';
 import { cn } from '@/lib/utils';
 
 interface ProductDetailsClientProps {

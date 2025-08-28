@@ -1,31 +1,44 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { LayoutDashboard, Package, PackageX, BarChart3, List, Clock, CalendarDays, Eye, ShoppingBag, BarChart2 } from 'lucide-react';
-import { getProducts, getMostRecentProduct, getTodaysSalesSummary } from '@/services/productService';
 import type { Product } from '@/types/product';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { getApiUrl } from '@/lib/api-utils';
+import { cookies } from 'next/headers';
 
 // Fetch data on the server
 async function getDashboardData() {
   try {
-    const products = await getProducts();
-    const totalProducts = products.length;
-    const zeroQuantityProducts = products.filter(p => p.quantity === 0);
-    const recentProduct = await getMostRecentProduct();
-    const { ordersToday, salesTodayAmount } = await getTodaysSalesSummary();
+    // Get admin token from cookies
+    const cookiesList = await cookies();
+    const authToken = cookiesList.get('admin_token')?.value;
 
-    return {
-      products,
-      totalProducts,
-      zeroQuantityProducts,
-      recentProduct,
-      ordersToday,
-      salesTodayAmount,
-      error: null,
-    };
+    if (!authToken) {
+      throw new Error('Unauthorized - Please log in');
+    }
+
+    const response = await fetch(getApiUrl('/api/admin/dashboard'), {
+      cache: 'no-store', // Don't cache dashboard data
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include', // Include cookies in the request
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Failed to fetch dashboard data: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    if (!data || typeof data !== 'object') {
+      throw new Error('Invalid dashboard data format received');
+    }
+
+    return data;
   } catch (error) {
     console.warn("Error fetching dashboard data:", error);
     const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
@@ -34,8 +47,8 @@ async function getDashboardData() {
       totalProducts: 0,
       zeroQuantityProducts: [],
       recentProduct: null,
-      ordersToday: 0, // Default on error
-      salesTodayAmount: 0, // Default on error
+      ordersToday: 0,
+      salesTodayAmount: 0,
       error: errorMessage,
     };
   }
@@ -109,15 +122,15 @@ export default async function AdminDashboardPage() {
                  <>
                      <p className="text-xs text-muted-foreground mb-2">Products with zero quantity</p>
                      <ul className="list-disc list-inside text-xs max-h-20 overflow-y-auto">
-                        {zeroQuantityProducts.map(p => <li key={p.id} className="truncate">{p.name}</li>)}
+                        {zeroQuantityProducts.map((p: Product) => <li key={p.id} className="truncate">{p.name}</li>)}
                      </ul>
                  </>
              ) : (
                 <p className="text-xs text-muted-foreground">All products are in stock</p>
              )}
-             <Link href="/admin/inventory" passHref legacyBehavior>
-                 <Button variant="link" size="sm" className="p-0 h-auto mt-2 text-xs">View Inventory</Button>
-             </Link>
+             <Button variant="link" size="sm" className="p-0 h-auto mt-2 text-xs" asChild>
+               <Link href="/admin/inventory">View Inventory</Link>
+             </Button>
           </CardContent>
         </Card>
 
@@ -170,8 +183,7 @@ export default async function AdminDashboardPage() {
           </CardContent>
         </Card>
 
-        <Link href="/admin/analytics" passHref legacyBehavior>
-          <a className="block">
+        <Link href="/admin/analytics" className="block">
             <Card className="shadow-md hover:shadow-lg transition-shadow bg-secondary/30 h-full">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Product Analytics</CardTitle>
@@ -191,7 +203,6 @@ export default async function AdminDashboardPage() {
                 </p>
               </CardContent>
             </Card>
-          </a>
         </Link>
 
       </div>

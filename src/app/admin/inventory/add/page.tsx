@@ -159,7 +159,7 @@ export default function AddProductPage() {
         subCategory: data.category === 'Custom Prints' ? '' : data.subCategory || '',
         description: data.description,
         price: data.price,
-        quantity: data.quantity,
+        stockQuantity: data.quantity,
         imageFiles: data.imageFiles || [],
         primaryImageIndex: primaryImageIndex,
     };
@@ -190,7 +190,7 @@ export default function AddProductPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-4">
-        <Link href="/admin/inventory" passHref legacyBehavior>
+        <Link href="/admin/inventory" className="inline-block">
            <Button variant="outline" size="icon" className="h-8 w-8">
               <ArrowLeft className="h-4 w-4" />
               <span className="sr-only">Back to Inventory</span>

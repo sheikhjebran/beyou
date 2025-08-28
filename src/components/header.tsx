@@ -186,12 +186,14 @@ export function Header({}: HeaderProps) {
 
         <Link href="/" className="flex items-center mx-auto md:mx-0 md:mr-4 shrink-0" aria-label="BeYou Homepage">
             <Image
-                src="/BeYou.png" 
+                src="/icons/BeYou.png" 
                 alt="BeYou Logo"
                 width={130}
                 height={60}
-                style={{ objectFit: 'contain' }}
-                priority 
+                className="w-auto h-[60px] object-contain"
+                priority={true}
+                fetchPriority="high"
+                loading="eager"
             />
         </Link>
 
@@ -281,10 +283,15 @@ export function Header({}: HeaderProps) {
               <button type="submit" className="hidden">Search</button>
             </form>
           
-           <Link href="/checkout" legacyBehavior passHref>
-             <Button variant="ghost" size="icon" aria-label="Shopping Cart" className="relative" suppressHydrationWarning>
-               <ShoppingCart className="h-5 w-5" />
-               {isClientMounted && totalItems > 0 && (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="relative" 
+              asChild
+            >
+              <Link href="/checkout" aria-label="Shopping Cart">
+                <ShoppingCart className="h-5 w-5" />
+                {isClientMounted && totalItems > 0 && (
                  <Badge
                     variant="destructive"
                     className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center rounded-full text-xs"
@@ -292,15 +299,13 @@ export function Header({}: HeaderProps) {
                     {totalItems}
                  </Badge>
                )}
-             </Button>
-           </Link>
-
-           <Link href="/login" passHref legacyBehavior>
-             <Button variant="outline" size="sm" className="hidden sm:inline-flex" aria-label="Admin Login" suppressHydrationWarning>
+              </Link>
+            </Button>           <Button variant="outline" size="sm" className="sm:inline-flex" asChild>
+             <Link href="/login" aria-label="Admin Login">
                <LogIn className="mr-1.5 h-4 w-4" />
                Admin
-             </Button>
-           </Link>
+             </Link>
+           </Button>
         </div>
       </div>
     </header>

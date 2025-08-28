@@ -37,25 +37,26 @@ const MAX_FILE_SIZE_MB = 5;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
+type BannerFormValues = {
+  title: string;
+  subtitle: string;
+  imageFile: File | null;
+};
+
 const bannerFormSchema = z.object({
   title: z.string()
     .refine(val => val.length === 0 || (val.length >= 3 && val.length <= 100), {
       message: "Title must be empty or between 3 and 100 characters."
-    })
-    .optional()
-    .default(''),
+    }),
   subtitle: z.string()
     .refine(val => val.length === 0 || (val.length >= 5 && val.length <= 200), {
       message: "Subtitle must be empty or between 5 and 200 characters."
-    })
-    .optional()
-    .default(''),
-  imageFile: z.instanceof(File)
-    .refine(file => file.size <= MAX_FILE_SIZE_BYTES, `Image size should be less than ${MAX_FILE_SIZE_MB}MB.`)
-    .refine(file => ALLOWED_IMAGE_TYPES.includes(file.type), `Only .jpg, .png, and .webp formats are supported.`),
+    }),
+  imageFile: z.custom<File>((val) => val instanceof File)
+    .refine(file => file instanceof File && file.size <= MAX_FILE_SIZE_BYTES, `Image size should be less than ${MAX_FILE_SIZE_MB}MB.`)
+    .refine(file => file instanceof File && ALLOWED_IMAGE_TYPES.includes(file.type), `Only .jpg, .png, and .webp formats are supported.`)
+    .nullable(),
 });
-
-type BannerFormValues = z.infer<typeof bannerFormSchema>;
 
 const categoryImageFormSchema = z.object({
   selectedCategory: z.string().min(1, "Please select a category."),
@@ -129,20 +130,21 @@ export default function CustomizePage() {
       const fetchCatImage = async () => {
         setIsLoadingCategoryImage(true);
         setCategoryImageError(null);
-        setCategoryImagePreviewUrl(null); // Clear old preview
         categoryImageForm.resetField('categoryImageFile'); // Clear file input
+        
+        const defaultPlaceholder = `/coming-soon.png`;
+        
         try {
           const imageData = await getCategoryImage(watchedCategory);
           setCurrentCategoryData(imageData);
-          if (imageData) {
+          if (imageData?.imageUrl) {
             setCategoryImagePreviewUrl(imageData.imageUrl);
           } else {
-            // Set default placeholder if no custom image
-            setCategoryImagePreviewUrl(`https://placehold.co/400x300.png?text=${encodeURIComponent(watchedCategory)}`);
+            setCategoryImagePreviewUrl(defaultPlaceholder);
           }
         } catch (err) {
           setCategoryImageError(err instanceof Error ? err.message : "Failed to load category image.");
-          setCategoryImagePreviewUrl(`https://placehold.co/400x300.png?text=Error`); // Error placeholder
+          setCategoryImagePreviewUrl(defaultPlaceholder);
         } finally {
           setIsLoadingCategoryImage(false);
         }
@@ -169,7 +171,12 @@ export default function CustomizePage() {
   };
 
   const onBannerSubmit: SubmitHandler<BannerFormValues> = async (data) => {
+    if (!data.imageFile) {
+      setBannerError("Please select an image file.");
+      return;
+    }
     setIsSubmittingBanner(true);
+    setBannerError(null);
     try {
       // Pass title and subtitle, which might be empty strings from the form if not filled
       await addBanner({
@@ -203,7 +210,7 @@ export default function CustomizePage() {
     if (!bannerToDelete) return;
     setIsDeletingBanner(true);
     try {
-      await deleteBanner(bannerToDelete.id, bannerToDelete.filePath);
+      await deleteBanner(bannerToDelete.id);
       toast({ title: "Banner Deleted", description: `Banner "${bannerToDelete.title || 'Untitled'}" deleted.` });
       setBanners(prev => prev.filter(b => b.id !== bannerToDelete.id));
     } catch (err) {
@@ -244,9 +251,13 @@ export default function CustomizePage() {
     setIsUpdatingCategoryImage(true);
     setCategoryImageError(null);
     try {
-      const newImageUrl = await updateCategoryImage(data.selectedCategory, data.categoryImageFile);
-      setCurrentCategoryData({ imageUrl: newImageUrl, filePath: '', updatedAt: new Date() as any }); // filePath not immediately known here, service handles it
-      setCategoryImagePreviewUrl(newImageUrl);
+      await updateCategoryImage(data.selectedCategory, data.categoryImageFile);
+      // After update, fetch the new image data
+      const imageData = await getCategoryImage(data.selectedCategory);
+      setCurrentCategoryData(imageData);
+      if (imageData) {
+        setCategoryImagePreviewUrl(imageData.imageUrl);
+      }
       toast({ title: "Category Image Updated", description: `Image for "${data.selectedCategory}" has been updated.` });
       categoryImageForm.resetField('categoryImageFile'); // Clear file input
     } catch (err) {
@@ -459,7 +470,12 @@ export default function CustomizePage() {
                       type="button"
                       variant="destructive"
                       onClick={() => openDeleteCatImgConfirmationDialog(watchedCategory)}
-                      disabled={isDeletingCategoryImage || !watchedCategory || !currentCategoryData?.imageUrl || currentCategoryData.imageUrl.includes('placehold.co')}
+                      disabled={
+                        isDeletingCategoryImage || 
+                        !watchedCategory || 
+                        !currentCategoryData?.imageUrl || 
+                        currentCategoryData.imageUrl === '/coming-soon.png'
+                      }
                       className="w-full sm:w-auto"
                     >
                       <Trash2 className="mr-2 h-4 w-4" /> Delete Custom Image
