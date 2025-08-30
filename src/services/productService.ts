@@ -7,7 +7,7 @@ import {
     TodaysSalesSummary, 
     ProductSaleSummary, 
     TopSaleByQuantity, 
-    ProductRevenueSummary 
+    ProductRevenueSummary
 } from './server/productService';
 import { uploadImage } from '@/lib/imageStorage';
 
@@ -30,6 +30,7 @@ export async function getProducts(
         isBestSeller?: boolean;
     }
 ): Promise<PaginatedProducts> {
+    console.log('Fetching products with params:', { page, pageSize, filters });
     const params = new URLSearchParams({
         page: page.toString(),
         pageSize: pageSize.toString(),
@@ -45,6 +46,36 @@ export async function getProducts(
         throw new Error('Failed to fetch products');
     }
     return response.json();
+}
+
+export async function recordSaleAndUpdateStock(productId: string, quantitySold: number): Promise<void> {
+    console.log('Recording sale:', { productId, quantitySold });
+    const data = {
+        productId: productId.toString(),
+        quantitySold: parseInt(quantitySold.toString())
+    };
+    console.log('Sending data to API:', data);
+    
+    const response = await fetch('/api/products/update-stock', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    });
+
+    const text = await response.text();
+    
+    if (!response.ok) {
+        throw new Error(text || 'Failed to record sale and update stock');
+    }
+    
+    try {
+        const data = JSON.parse(text);
+        console.log('Sale recorded successfully:', data);
+    } catch (e) {
+        console.log('Non-JSON response:', text);
+    }
 }
 
 export async function getBestSellingProducts(): Promise<Product[]> {
@@ -82,6 +113,9 @@ export async function addProduct(productData: AddProductData): Promise<string> {
             productData.imageFiles.map((file: File) => uploadImage(file, 'products'))
         );
 
+        // Log uploaded images
+        console.log('Uploaded images:', uploadedImages);
+
         // Create form data with the image URLs
         const formData = new FormData();
         formData.append('name', productData.name);
@@ -90,12 +124,13 @@ export async function addProduct(productData: AddProductData): Promise<string> {
         formData.append('description', productData.description);
         formData.append('price', productData.price.toString());
         formData.append('stock_quantity', productData.stock_quantity.toString());
-        formData.append('primaryImageIndex', productData.primaryImageIndex.toString());
         
         // Add image paths
         uploadedImages.forEach((image: { path: string }, index: number) => {
+            console.log('Adding image path:', image.path);
             formData.append('imagePaths', image.path);
             if (index === productData.primaryImageIndex) {
+                console.log('Setting primary image path:', image.path);
                 formData.append('primaryImagePath', image.path);
             }
         });
@@ -212,19 +247,4 @@ export async function updateProductBestSellerStatus(productId: string, isBestSel
     }
 }
 
-export async function recordSaleAndUpdateStock(productId: string, quantitySold: number): Promise<void> {
-    const response = await fetch('/api/products', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            operation: 'recordSale',
-            productId,
-            quantitySold,
-        }),
-    });
-    if (!response.ok) {
-        throw new Error('Failed to record sale and update stock');
-    }
-}
+

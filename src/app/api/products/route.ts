@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import * as productService from '@/services/server/productService';
+import { saveFile } from '@/lib/fileUpload';
 
 export async function GET(request: NextRequest) {
     try {
@@ -57,26 +58,31 @@ export async function POST(request: NextRequest) {
         const formData = await request.formData();
         const name = formData.get('name') as string;
         const category = formData.get('category') as string;
-        const subCategory = formData.get('subCategory') as string;
+        const subcategory = formData.get('subCategory') as string || null;
         const description = formData.get('description') as string;
         const price = Number(formData.get('price'));
-        const stockQuantity = Number(formData.get('stockQuantity'));
-        const imageFiles = formData.getAll('images') as File[];
-
-        // Process image files to get URLs
-        const imageUrls = ['placeholder_url']; // This should be replaced with actual image upload logic
-        const primaryImageUrl = imageUrls[0];
+        const stock_quantity = Number(formData.get('stock_quantity')) || 0; // Default to 0 if null
+        
+        // Get image paths from the pre-uploaded images
+        const image_paths = formData.getAll('imagePaths').map(path => path.toString());
+        const primary_image_path = formData.get('primaryImagePath')?.toString() || image_paths[0] || null;
+        
+        // Log the received image data
+        console.log('Received image data:', {
+            image_paths,
+            primary_image_path
+        });
 
         const data = {
             name,
             category,
-            subCategory,
+            subcategory,
             description,
             price,
-            stockQuantity,
-            isBestSeller: false, // default value
-            primaryImageUrl,
-            imageUrls
+            stock_quantity,
+            is_best_seller: false, // default value
+            primary_image_path,
+            image_paths
         };
 
         const result = await productService.addProduct(data);

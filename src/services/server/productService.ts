@@ -266,8 +266,8 @@ export async function addProduct(product: Omit<Product, 'id' | 'created_at' | 'u
         
         const productId = uuidv4(); // Generate UUID for product
 
-        // First insert the product
-        await connection.query(`
+        // Log the product insert query
+        const productQuery = `
             INSERT INTO products (
                 id,
                 name, 
@@ -279,7 +279,8 @@ export async function addProduct(product: Omit<Product, 'id' | 'created_at' | 'u
                 is_best_seller,
                 primary_image_path
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `, [
+        `;
+        const productValues = [
             productId,
             product.name,
             product.category,
@@ -289,29 +290,44 @@ export async function addProduct(product: Omit<Product, 'id' | 'created_at' | 'u
             product.stock_quantity,
             product.is_best_seller ? 1 : 0,
             product.primary_image_path
-        ]);
+        ];
+        
+        console.log('Product Insert Query:', productQuery);
+        console.log('Product Insert Values:', JSON.stringify(productValues, null, 2));
+        
+        await connection.query(productQuery, productValues);
 
         // Insert image records
         if (product.image_paths && product.image_paths.length > 0) {
-            const imageValues = product.image_paths.map((path) => [
-                uuidv4(), // Generate UUID for each image
-                productId,
-                path,
-                path === product.primary_image_path ? 1 : 0, // is_primary as tinyint
-                new Date(),
-                new Date()
-            ]);
+            // Filter out any invalid paths
+            const validImagePaths = product.image_paths.filter(path => path && path.trim());
+            
+            if (validImagePaths.length > 0) {
+                const imageValues = validImagePaths.map((path) => [
+                    uuidv4(), // Generate UUID for each image
+                    productId,
+                    path.trim(),
+                    path.trim() === product.primary_image_path?.trim() ? 1 : 0, // is_primary as tinyint
+                    new Date(),
+                    new Date()
+                ]);
 
-            await connection.query(`
-                INSERT INTO product_images (
-                    id,
-                    product_id,
-                    image_path,
-                    is_primary,
-                    created_at,
-                    updated_at
-                ) VALUES ?
-            `, [imageValues]);
+                const imagesQuery = `
+                    INSERT INTO product_images (
+                        id,
+                        product_id,
+                        image_path,
+                        is_primary,
+                        created_at,
+                        updated_at
+                    ) VALUES ?
+                `;
+                
+                console.log('Images Insert Query:', imagesQuery);
+                console.log('Images Insert Values:', JSON.stringify(imageValues, null, 2));
+                
+                await connection.query(imagesQuery, [imageValues]);
+            }
         }
 
         await connection.commit();

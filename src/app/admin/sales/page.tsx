@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -31,12 +31,14 @@ export default function SalesPage() {
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [isSubmittingSale, setIsSubmittingSale] = useState(false);
   const [formError, setFormError] = useState<string | null>(null); // For dynamic validation errors
+  const [page] = useState(1);
+  const [pageSize] = useState(100); // Load more products for sales page
 
   const form = useForm<SalesFormValues>({
     resolver: zodResolver(
       salesFormSchemaBase.refine(
         (data) => {
-          if (selectedProduct && data.quantitySold > selectedProduct.quantity) {
+          if (selectedProduct && data.quantitySold > selectedProduct.stock_quantity) {
             return false;
           }
           return true;
@@ -59,8 +61,9 @@ export default function SalesPage() {
     async function loadProducts() {
       setIsLoadingProducts(true);
       try {
-        const fetchedProducts = await getProducts();
-        setProducts(fetchedProducts);
+        const response = await getProducts(page, pageSize);
+        console.log('Products loaded:', response.products);
+        setProducts(response.products);
       } catch (error) {
         console.error("Error loading products for sales page:", error);
         toast({
@@ -77,7 +80,9 @@ export default function SalesPage() {
 
   useEffect(() => {
     if (watchedProductId) {
+      console.log('Selected product ID:', watchedProductId);
       const product = products.find(p => p.id === watchedProductId);
+      console.log('Found product details:', product);
       setSelectedProduct(product || null);
       form.setValue('quantitySold', 1); // Reset quantity when product changes
       form.trigger('quantitySold'); // Re-validate quantity
@@ -87,36 +92,67 @@ export default function SalesPage() {
   }, [watchedProductId, products, form]);
 
   const onSubmit: SubmitHandler<SalesFormValues> = async (data) => {
+    console.log('Form submission data:', data);
+    console.log('Selected product details:', {
+      id: selectedProduct?.id,
+      name: selectedProduct?.name,
+      currentStock: selectedProduct?.stock_quantity,
+      price: selectedProduct?.price,
+      quantityToSell: data.quantitySold,
+      remainingStockAfterSale: selectedProduct ? selectedProduct.stock_quantity - data.quantitySold : 0
+    });
+    
     if (!selectedProduct) {
       setFormError("Please select a product.");
       return;
     }
-    if (data.quantitySold > selectedProduct.quantity) {
-      form.setError("quantitySold", { type: "manual", message: `Only ${selectedProduct.quantity} items in stock.` });
+    if (data.quantitySold > selectedProduct.stock_quantity) {
+      form.setError("quantitySold", { type: "manual", message: `Only ${selectedProduct.stock_quantity} items in stock.` });
       return;
     }
     setFormError(null);
     setIsSubmittingSale(true);
 
     try {
+      console.log('Submitting sale:', { 
+        productId: data.productId, 
+        quantitySold: data.quantitySold,
+        selectedProduct 
+      });
+
       await recordSaleAndUpdateStock(data.productId, data.quantitySold);
+      
       toast({
         title: "Sale Recorded",
         description: `${data.quantitySold} unit(s) of "${selectedProduct.name}" sold successfully. Stock updated.`,
       });
+
       // Refresh products list to show updated quantity
       setIsLoadingProducts(true);
-      const fetchedProducts = await getProducts();
-      setProducts(fetchedProducts);
+      const response = await getProducts(page, pageSize);
+      console.log('Updated products after sale:', response.products);
+      setProducts(response.products);
+      
       // Reset form and selected product
       form.reset({ productId: '', quantitySold: 1 });
       setSelectedProduct(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error recording sale:", error);
+      let errorMessage = "An unexpected error occurred.";
+      
+      try {
+        if (error.message) {
+          const parsed = JSON.parse(error.message);
+          errorMessage = parsed.error || errorMessage;
+        }
+      } catch (e) {
+        errorMessage = error.message || errorMessage;
+      }
+
       toast({
         variant: "destructive",
         title: "Error Recording Sale",
-        description: error instanceof Error ? error.message : "An unexpected error occurred.",
+        description: errorMessage
       });
     } finally {
       setIsSubmittingSale(false);
@@ -170,9 +206,9 @@ export default function SalesPage() {
                         </FormControl>
                         <SelectContent>
                           {products.map((product) => (
-                            <SelectItem key={product.id} value={product.id} disabled={product.quantity === 0}>
-                              {product.name} (Stock: {product.quantity})
-                              {product.quantity === 0 && " - Out of Stock"}
+                            <SelectItem key={product.id} value={product.id} disabled={product.stock_quantity === 0}>
+                              {product.name} (Stock: {product.stock_quantity})
+                              {product.stock_quantity === 0 && " - Out of Stock"}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -188,7 +224,7 @@ export default function SalesPage() {
                       <span className="font-medium">Selected:</span> {selectedProduct.name}
                     </p>
                     <p className="text-sm">
-                      <span className="font-medium">Current Stock:</span> {selectedProduct.quantity}
+                      <span className="font-medium">Current Stock:</span> {selectedProduct.stock_quantity}
                     </p>
                     <p className="text-sm">
                       <span className="font-medium">Price per unit:</span> ₹{selectedProduct.price.toFixed(2)}
@@ -207,9 +243,9 @@ export default function SalesPage() {
                           type="number"
                           placeholder="e.g., 5"
                           {...field}
-                          disabled={!selectedProduct || selectedProduct.quantity === 0}
+                          disabled={!selectedProduct || selectedProduct.stock_quantity === 0}
                           min="1"
-                          max={selectedProduct?.quantity}
+                          max={selectedProduct?.stock_quantity}
                         />
                       </FormControl>
                       <FormMessage />
@@ -237,7 +273,7 @@ export default function SalesPage() {
 
                 <Button
                   type="submit"
-                  disabled={isSubmittingSale || !selectedProduct || selectedProduct.quantity === 0 || !form.formState.isValid}
+                  disabled={isSubmittingSale || !selectedProduct || selectedProduct.stock_quantity === 0 || !form.formState.isValid}
                   className="w-full md:w-auto"
                 >
                   {isSubmittingSale ? (

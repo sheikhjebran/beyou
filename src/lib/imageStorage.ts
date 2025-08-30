@@ -21,10 +21,12 @@ export async function uploadImage(file: File, subDirectory: string): Promise<Upl
     }
 
     const result = await response.json();
+    // Ensure we're using the correct path format
+    const imagePath = result.path.startsWith('/') ? result.path : `/${result.path}`;
     return {
         filename: result.filename,
-        path: result.path,
-        url: `/${result.path}`
+        path: imagePath,
+        url: imagePath
     };
 }
 

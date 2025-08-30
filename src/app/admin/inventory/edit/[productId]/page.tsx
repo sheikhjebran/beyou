@@ -264,10 +264,71 @@ export default function EditProductPage() {
     form.setValue('imageFiles', updatedFiles.length > 0 ? updatedFiles : null, { shouldDirty: true });
   };
   
-  const handleExistingImageClick = (url: string) => {
-    if (newImagePreviews.length === 0) { // Only allow selecting from existing if no new images are staged
-        setPrimaryImageMarker(url);
-        form.setValue('name', form.getValues('name'), { shouldDirty: true }); // Trick to enable save button if only primary image changed among existing
+  const handleSetPrimary = async (imagePath: string) => {
+    if (!productId || imagePath === primaryImageMarker) return;
+
+    try {
+        const response = await fetch(`/api/products/images?productId=${productId}&imagePath=${encodeURIComponent(imagePath)}`, {
+            method: 'PUT'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to set primary image');
+        }
+
+        setPrimaryImageMarker(imagePath);
+        toast({
+            title: "Success",
+            description: "Primary image updated successfully"
+        });
+    } catch (error) {
+        console.error('Error setting primary image:', error);
+        toast({
+            variant: "destructive",
+            title: "Error",
+            description: error instanceof Error ? error.message : "Failed to set primary image"
+        });
+    }
+  };
+
+  const handleDeleteImage = async (imagePath: string) => {
+    if (!productId || imagePath === primaryImageMarker) {
+        toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Cannot delete the primary image. Please set another image as primary first."
+        });
+        return;
+    }
+
+    if (!confirm('Are you sure you want to delete this image?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/products/images?productId=${productId}&imagePath=${encodeURIComponent(imagePath)}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to delete image');
+        }
+
+        // Remove the image from currentImagePreviews
+        setCurrentImagePreviews(prev => prev.filter(url => url !== imagePath));
+        toast({
+            title: "Success",
+            description: "Image deleted successfully"
+        });
+    } catch (error) {
+        console.error('Error deleting image:', error);
+        toast({
+            variant: "destructive",
+            title: "Error",
+            description: error instanceof Error ? error.message : "Failed to delete image"
+        });
     }
   };
 
@@ -450,20 +511,49 @@ export default function EditProductPage() {
                             <div className="mt-2 mb-4">
                                 <p className="text-sm text-muted-foreground mb-1">Current Images (Click to make primary):</p>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                                {currentImagePreviews.map((url, index) => (
-                                    <div key={`current-${index}`} className="relative aspect-square group cursor-pointer" onClick={() => handleExistingImageClick(url)}>
-                                        <div className="relative w-full h-full">
-                                            <Image 
-                                                src={url} 
-                                                alt={`Current image ${index + 1}`} 
-                                                fill 
-                                                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
-                                                className={`object-cover rounded-md border-2 ${url === primaryImageMarker ? 'border-primary ring-2 ring-primary' : 'border-transparent'}`}
-                                            />
+                                    {currentImagePreviews.map((url, index) => (
+                                        <div key={`current-${index}`} className="relative aspect-square group">
+                                            <div className="relative w-full h-full">
+                                                <Image 
+                                                    src={url} 
+                                                    alt={`Current image ${index + 1}`} 
+                                                    fill 
+                                                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                                                    className={`object-cover rounded-md border-2 ${url === primaryImageMarker ? 'border-primary ring-2 ring-primary' : 'border-transparent'}`}
+                                                />
+                                            </div>
+                                            {url === primaryImageMarker ? (
+                                                <Badge variant="secondary" className="absolute top-1 left-1 text-xs z-10">Primary</Badge>
+                                            ) : (
+                                                <div className="absolute top-1 right-1 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <Button
+                                                        type="button"
+                                                        variant="secondary"
+                                                        size="icon"
+                                                        className="h-6 w-6 bg-white hover:bg-white/90"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleSetPrimary(url);
+                                                        }}
+                                                    >
+                                                        <Star className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        type="button"
+                                                        variant="destructive"
+                                                        size="icon"
+                                                        className="h-6 w-6"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleDeleteImage(url);
+                                                        }}
+                                                    >
+                                                        <XCircle className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            )}
                                         </div>
-                                        {url === primaryImageMarker && <Badge variant="secondary" className="absolute top-1 left-1 text-xs z-10">Primary</Badge>}
-                                    </div>
-                                ))}
+                                    ))}
                                 </div>
                             </div>
                         )}
@@ -471,15 +561,15 @@ export default function EditProductPage() {
                             <div className="mt-2 mb-4">
                                 <p className="text-sm text-muted-foreground mb-1">New Images Preview (Click to make primary):</p>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                                {newImagePreviews.map((url, index) => (
-                                    <div key={`new-${index}`} className="relative aspect-square group cursor-pointer" onClick={() => handleNewPreviewClick(index)}>
-                                        <Image src={url} alt={`New preview ${index + 1}`} fill className={`object-cover rounded-md border-2 ${index === primaryImageMarker ? 'border-primary ring-2 ring-primary' : 'border-transparent'}`} />
-                                        {index === primaryImageMarker && <Badge variant="default" className="absolute top-1 left-1 text-xs z-10">Primary</Badge>}
-                                        <Button type="button" variant="destructive" size="icon" className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity z-20" onClick={(e) => {e.stopPropagation(); removeNewPreviewImage(index)}}>
-                                            <XCircle className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                ))}
+                                    {newImagePreviews.map((url, index) => (
+                                        <div key={`new-${index}`} className="relative aspect-square group cursor-pointer" onClick={() => handleNewPreviewClick(index)}>
+                                            <Image src={url} alt={`New preview ${index + 1}`} fill className={`object-cover rounded-md border-2 ${index === primaryImageMarker ? 'border-primary ring-2 ring-primary' : 'border-transparent'}`} />
+                                            {index === primaryImageMarker && <Badge variant="default" className="absolute top-1 left-1 text-xs z-10">Primary</Badge>}
+                                            <Button type="button" variant="destructive" size="icon" className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity z-20" onClick={(e) => {e.stopPropagation(); removeNewPreviewImage(index)}}>
+                                                <XCircle className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         )}
