@@ -38,16 +38,24 @@ export function LoginFormContent() {
   });
 
   const onSubmit = async (data: LoginFormValues) => {
+    if (isLoading) return;
+    
     setIsLoading(true);
     setError(null);
+    
     try {
       await login(data.email, data.password);
-      toast({ 
-        title: "Success", 
-        description: "You have been successfully logged in.",
-        variant: "default"
-      });
-      router.push('/admin');
+      
+      // Use setTimeout to ensure state updates are processed before navigation
+      setTimeout(() => {
+        toast({ 
+          title: "Success", 
+          description: "You have been successfully logged in.",
+          variant: "default"
+        });
+        router.push('/admin');
+      }, 0);
+      
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to log in';
       setError(errorMessage);

@@ -37,15 +37,26 @@ import { Label } from '@/components/ui/label';
 import useSWR from 'swr';
 
 const fetcher = async (url: string) => {
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error('Failed to fetch products');
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error('Failed to fetch products');
+    }
+    const data = await res.json();
+    if (!data || !data.products) {
+      return [];  // Return empty array if no products
+    }
+    return data.products;
+  } catch (error) {
+    // Convert any error to a string message
+    throw new Error(error instanceof Error ? error.message : 'Failed to load products');
   }
-  return res.json();
 };
 
 export default function InventoryPage() {
-  const { data: products = [], error, isLoading, mutate } = useSWR<Product[]>('/api/products', fetcher);
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+  const { data: products = [], error, isLoading, mutate } = useSWR<Product[]>(`/api/products?page=${page}&pageSize=${pageSize}`, fetcher);
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
   const [togglingProductId, setTogglingProductId] = useState<string | null>(null);
   const { toast } = useToast();
@@ -58,22 +69,27 @@ export default function InventoryPage() {
   };
 
   const handleBestSellerToggle = async (product: Product) => {
-    const newStatus = !product.isBestSeller;
+    const newStatus = !product.is_best_seller;
     setTogglingProductId(product.id);
+    
+    // Optimistically update the UI first
+    const previousProducts = products;
+    await mutate(
+      products.map((p: Product) =>
+        p.id === product.id ? { ...p, is_best_seller: newStatus } : p
+      ),
+      false
+    );
+
     try {
       await updateProductBestSellerStatus(product.id, newStatus);
-      // Optimistically update the UI
-      await mutate(
-        products.map((p: Product) =>
-          p.id === product.id ? { ...p, isBestSeller: newStatus } : p
-        ),
-        false
-      );
       toast({
         title: "Status Updated",
         description: `"${product.name}" is ${newStatus ? 'now' : 'no longer'} a best seller.`,
       });
     } catch (err) {
+      // Revert to previous state on error
+      await mutate(previousProducts, false);
       toast({
         variant: "destructive",
         title: "Update Failed",
@@ -136,16 +152,29 @@ export default function InventoryPage() {
           <CardDescription>View, add, edit, or delete your products. Use the toggle to mark items as best sellers.</CardDescription>
         </CardHeader>
         <CardContent>
-           {error && (
+           {error ? (
               <Alert variant="destructive" className="mb-4">
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle>Error Loading Products</AlertTitle>
-                <AlertDescription>{error}</AlertDescription>
+                <AlertDescription>{error.message}</AlertDescription>
               </Alert>
-           )}
-          <Table>
-            <TableCaption>A list of your products.</TableCaption>
-            <TableHeader>
+           ) : products.length === 0 && !isLoading ? (
+              <Alert className="mb-4">
+                <PackageSearch className="h-4 w-4" />
+                <AlertTitle>No Products Found</AlertTitle>
+                <AlertDescription>
+                  There are no products in your inventory. Click the "Add Product" button to add your first product.
+                </AlertDescription>
+              </Alert>
+           ) : null}
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          ) : products.length === 0 ? null : (
+            <Table>
+              <TableCaption>A list of your products.</TableCaption>
+              <TableHeader>
               <TableRow>
                 <TableHead className="w-[80px]">Image</TableHead>
                 <TableHead>Name</TableHead>
@@ -184,7 +213,7 @@ export default function InventoryPage() {
                     <TableCell>
                       <div className="relative w-16 h-16">
                         <Image
-                          src={product.primaryImageUrl || 'https://placehold.co/64x64.png'}
+                          src={product.primary_image_path || '/images/placeholder.png'}
                           alt={product.name}
                           fill // Use fill for responsive fixed size containers
                           sizes="64px" // Provide an accurate size
@@ -195,7 +224,7 @@ export default function InventoryPage() {
                     </TableCell>
                     <TableCell className="font-medium">{product.name}</TableCell>
                     <TableCell>{product.category}</TableCell>
-                    <TableCell>{product.subCategory}</TableCell>
+                    <TableCell>{product.subcategory}</TableCell>
                     <TableCell>
                         <div className="flex items-center space-x-2">
                            {togglingProductId === product.id ? (
@@ -203,7 +232,7 @@ export default function InventoryPage() {
                            ) : (
                                 <Switch
                                     id={`bestseller-${product.id}`}
-                                    checked={product.isBestSeller}
+                                    checked={product.is_best_seller}
                                     onCheckedChange={() => handleBestSellerToggle(product)}
                                     aria-label={`Mark ${product.name} as best seller`}
                                     disabled={togglingProductId === product.id}
@@ -215,7 +244,7 @@ export default function InventoryPage() {
                         </div>
                     </TableCell>
                     <TableCell className="text-right">₹{product.price.toFixed(2)}</TableCell>
-                    <TableCell className="text-right">{product.quantity ?? 'N/A'}</TableCell>
+                    <TableCell className="text-right">{product.stock_quantity ?? 'N/A'}</TableCell>
                     <TableCell className="text-center">
                       <div className="flex justify-center gap-2">
                         <Link href={`/admin/inventory/edit/${product.id}`} className="inline-block">
@@ -245,6 +274,7 @@ export default function InventoryPage() {
               )}
             </TableBody>
           </Table>
+          )}
         </CardContent>
       </Card>
 

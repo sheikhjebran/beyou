@@ -1,17 +1,46 @@
 'use client'
 
 import { Product } from '@/types/product';
+import type { AddProductData } from '@/types/productForm';
 import { 
-    AddProductData, 
     UpdateProductData, 
     TodaysSalesSummary, 
     ProductSaleSummary, 
     TopSaleByQuantity, 
     ProductRevenueSummary 
 } from './server/productService';
+import { uploadImage } from '@/lib/imageStorage';
 
-export async function getProducts(): Promise<Product[]> {
-    const response = await fetch('/api/products');
+export type PaginatedProducts = {
+    products: Product[];
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+};
+
+export async function getProducts(
+    page: number = 1,
+    pageSize: number = 10,
+    filters?: {
+        category?: string;
+        subCategory?: string;
+        minPrice?: number;
+        maxPrice?: number;
+        isBestSeller?: boolean;
+    }
+): Promise<PaginatedProducts> {
+    const params = new URLSearchParams({
+        page: page.toString(),
+        pageSize: pageSize.toString(),
+        ...(filters?.category && { category: filters.category }),
+        ...(filters?.subCategory && { subCategory: filters.subCategory }),
+        ...(filters?.minPrice && { minPrice: filters.minPrice.toString() }),
+        ...(filters?.maxPrice && { maxPrice: filters.maxPrice.toString() }),
+        ...(filters?.isBestSeller !== undefined && { isBestSeller: filters.isBestSeller.toString() }),
+    });
+
+    const response = await fetch(`/api/products?${params}`);
     if (!response.ok) {
         throw new Error('Failed to fetch products');
     }
@@ -23,7 +52,8 @@ export async function getBestSellingProducts(): Promise<Product[]> {
     if (!response.ok) {
         throw new Error('Failed to fetch best selling products');
     }
-    return response.json();
+    const data = await response.json();
+    return data.products || [];
 }
 
 export async function getMostRecentProduct(): Promise<Product | null> {
@@ -46,18 +76,46 @@ export async function getProductById(productId: string): Promise<Product | null>
 }
 
 export async function addProduct(productData: AddProductData): Promise<string> {
-    const response = await fetch('/api/products', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(productData),
-    });
-    if (!response.ok) {
-        throw new Error('Failed to add product');
+    try {
+        // Upload images first
+        const uploadedImages = await Promise.all(
+            productData.imageFiles.map((file: File) => uploadImage(file, 'products'))
+        );
+
+        // Create form data with the image URLs
+        const formData = new FormData();
+        formData.append('name', productData.name);
+        formData.append('category', productData.category);
+        formData.append('subCategory', productData.subCategory || '');
+        formData.append('description', productData.description);
+        formData.append('price', productData.price.toString());
+        formData.append('stock_quantity', productData.stock_quantity.toString());
+        formData.append('primaryImageIndex', productData.primaryImageIndex.toString());
+        
+        // Add image paths
+        uploadedImages.forEach((image: { path: string }, index: number) => {
+            formData.append('imagePaths', image.path);
+            if (index === productData.primaryImageIndex) {
+                formData.append('primaryImagePath', image.path);
+            }
+        });
+
+        const response = await fetch('/api/products', {
+            method: 'POST',
+            body: formData,
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || 'Failed to add product');
+        }
+        
+        const result = await response.json();
+        return result.id;
+    } catch (error) {
+        console.error('Error adding product:', error);
+        throw error;
     }
-    const result = await response.json();
-    return result.id;
 }
 
 export async function updateProduct(productId: string, productData: UpdateProductData): Promise<void> {
@@ -147,7 +205,7 @@ export async function updateProductBestSellerStatus(productId: string, isBestSel
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ isBestSeller }),
+        body: JSON.stringify({ is_best_seller: isBestSeller }), // Match the backend property name
     });
     if (!response.ok) {
         throw new Error('Failed to update product best seller status');

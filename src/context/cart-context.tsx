@@ -38,7 +38,7 @@ type CartProviderProps = {
 
 const CART_STORAGE_KEY = 'beyou_cart';
 
-export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
+export const CartProvider = React.memo(function CartProvider({ children }: CartProviderProps) {
   const [cartItems, setCartItems] = React.useState<CartItem[]>([]);
   const [isInitialized, setIsInitialized] = React.useState(false);
 
@@ -63,16 +63,26 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     }
   }, [cartItems, isInitialized]);
 
-  const addToCart = (product: Product, quantity: number, note = '') => {
+  const addToCart = (product: Product, quantity: number = 1, note = '') => {
     setCartItems((prevItems) => {
       const normalizedNote = note || ''; // Ensure note is a string for comparison
       const existingItemIndex = prevItems.findIndex(
         (item) => item.product.id === product.id && (item.note || '') === normalizedNote
       );
 
+      // Calculate total quantity including what's already in cart
+      const currentQuantity = existingItemIndex > -1 ? prevItems[existingItemIndex].quantity : 0;
+      const newTotalQuantity = currentQuantity + quantity;
+
+      // Check if we have enough stock
+      if (newTotalQuantity > product.stockQuantity) {
+        console.warn(`Not enough stock for ${product.name}. Available: ${product.stockQuantity}, Requested: ${newTotalQuantity}`);
+        return prevItems;
+      }
+
       if (existingItemIndex > -1) {
         const updatedItems = [...prevItems];
-        updatedItems[existingItemIndex].quantity += quantity;
+        updatedItems[existingItemIndex].quantity = newTotalQuantity;
         return updatedItems;
       } else {
         return [...prevItems, { product, quantity, note: normalizedNote }];
@@ -83,11 +93,17 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   const updateQuantity = (productId: string, newQuantity: number, itemNote?: string) => {
     const normalizedItemNote = itemNote || '';
     setCartItems((prevItems) => {
-       const updatedItems = prevItems.map((item) =>
-         item.product.id === productId && (item.note || '') === normalizedItemNote
-           ? { ...item, quantity: Math.max(0, newQuantity) } // Ensure quantity is not negative
-           : item
-       );
+       const updatedItems = prevItems.map((item) => {
+         if (item.product.id === productId && (item.note || '') === normalizedItemNote) {
+           // Ensure new quantity is within stock limits and not negative
+           const validQuantity = Math.min(
+             Math.max(0, newQuantity),
+             item.product.stockQuantity
+           );
+           return { ...item, quantity: validQuantity };
+         }
+         return item;
+       });
        return updatedItems.filter(item => item.quantity > 0); // Remove if quantity is 0
     });
   };
@@ -130,5 +146,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     <CartContext.Provider value={contextValue}>
       {children}
     </CartContext.Provider>
-  );
-};
+  )
+});
+
+export default CartProvider;

@@ -39,11 +39,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     useEffect(() => {
+        let isMounted = true;
+        
         const checkAuth = async () => {
             try {
                 const response = await fetch('/api/auth/verify', {
                     credentials: 'include'
                 });
+                if (!isMounted) return;
+                
                 if (response.ok) {
                     const data = await response.json();
                     setState(prev => ({ ...prev, currentUser: data.user, loading: false }));
@@ -51,12 +55,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     setState(prev => ({ ...prev, currentUser: null, loading: false }));
                 }
             } catch (error) {
+                if (!isMounted) return;
                 console.error('Error checking auth status:', error);
                 setState(prev => ({ ...prev, currentUser: null, loading: false }));
             }
         };
         
         checkAuth();
+        
+        return () => {
+            isMounted = false;
+        };
     }, []);
 
     const login = async (email: string, password: string) => {

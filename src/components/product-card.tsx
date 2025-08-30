@@ -29,7 +29,7 @@ export function ProductCard({ product, priority, className }: ProductCardProps) 
   const { toast } = useToast();
 
   const handleAddToCart = () => {
-    if (product.quantity === 0) {
+    if (product.stockQuantity === 0) {
       toast({
         title: "Out of Stock",
         description: "This item is currently out of stock.",
@@ -51,17 +51,17 @@ export function ProductCard({ product, priority, className }: ProductCardProps) 
         <CardHeader className="p-0">
           <Link href={`/product/${product.id}`} className="block relative aspect-[4/3] w-full group">
             <LoadingImage
-              src={product.primaryImageUrl || 'https://placehold.co/400x300.png'}
+              src={product.primary_image_path || '/images/placeholder.png'}
               alt={product.name}
               fill
               sizes="(max-width: 639px) 45vw, (max-width: 1023px) 30vw, 22vw"
               className={cn(
-                "object-cover transition-transform duration-300 group-hover:scale-105",
-                product.quantity === 0 && "blur-sm"
+                "rounded-md object-cover transition-transform duration-300 group-hover:scale-105",
+                product.stockQuantity === 0 && "blur-sm"
               )}
-              data-ai-hint="product fashion beauty"
+              data-ai-hint="product list item"
             />
-            {product.quantity === 0 && (
+            {product.stockQuantity === 0 && (
               <>
                 <div className="absolute inset-0 bg-black/30 z-10"></div>
                 <Badge
@@ -96,11 +96,11 @@ export function ProductCard({ product, priority, className }: ProductCardProps) 
       <CardFooter className="p-3 sm:p-4 pt-0">
         <Button 
           className="w-full" 
-          variant={product.quantity === 0 ? "outline" : "default"}
+          variant={product.stockQuantity === 0 ? "outline" : "default"}
           onClick={handleAddToCart}
-          disabled={product.quantity === 0}
+          disabled={product.stockQuantity === 0}
         >
-          {product.quantity === 0 ? 'Out of Stock' : 'Add to Cart'}
+          {product.stockQuantity === 0 ? 'Out of Stock' : 'Add to Cart'}
         </Button>
       </CardFooter>
     </Card>

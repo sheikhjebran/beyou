@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
 import { Loader2, ImageOff } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface Props {
   src: string
@@ -23,9 +23,34 @@ interface Props {
 export function LoadingImage(props: Props) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+  const [blurDataURL, setBlurDataURL] = useState<string | undefined>(undefined)
+
+  // Generate blur placeholder
+  useEffect(() => {
+    if (props.src && !blurDataURL) {
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      if (ctx) {
+        canvas.width = 10
+        canvas.height = 10
+        ctx.fillStyle = '#f3f4f6'
+        ctx.fillRect(0, 0, 10, 10)
+        setBlurDataURL(canvas.toDataURL())
+      }
+    }
+  }, [props.src, blurDataURL])
+
+  // Format local image paths
+  const getImageUrl = (src: string) => {
+    if (src.startsWith('http://') || src.startsWith('https://')) {
+      return src;
+    }
+    // For local images, ensure they start with a forward slash
+    return src.startsWith('/') ? src : `/${src}`;
+  };
 
   return (
-    <div className={cn('relative w-full h-full bg-muted/10', props.containerClassName)}>
+    <div className={cn('relative w-full h-full bg-muted/10 overflow-hidden', props.containerClassName)}>
       {loading && !error && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-muted/30 text-primary">
           <Loader2 className="h-6 w-6 animate-spin" />
@@ -38,12 +63,12 @@ export function LoadingImage(props: Props) {
         </div>
       ) : (
         <Image
-          src={props.src}
+          src={props.src && props.src !== '' ? getImageUrl(props.src) : '/images/placeholder.png'}
           alt={props.alt}
           width={props.width}
           height={props.height}
           priority={props.priority}
-          quality={props.quality}
+          quality={props.quality || 75}
           fill={props.fill}
           sizes={props.sizes}
           className={cn(
@@ -54,9 +79,11 @@ export function LoadingImage(props: Props) {
           )}
           data-ai-hint={props['data-ai-hint']}
           onLoad={() => setLoading(false)}
-          onError={() => {
-            setLoading(false)
-            setError(true)
+          onError={(e) => {
+            const imgElement = e.target as HTMLImageElement;
+            console.error('Image load error:', imgElement.src);
+            setLoading(false);
+            setError(true);
           }}
         />
       )}

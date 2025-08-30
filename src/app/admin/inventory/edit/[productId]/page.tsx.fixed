@@ -83,126 +83,85 @@ const productFormSchema = z.object({
 type ProductFormValues = z.infer<typeof productFormSchema>;
 
 export default function EditProductPage() {
+  const { productId } = useParams() as { productId: string };
   const router = useRouter();
-  const params = useParams();
-  const productId = params.productId as string;
   const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingProduct, setIsLoadingProduct] = useState(true);
-  const [productData, setProductData] = useState<Product | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
-  const [currentImagePreviews, setCurrentImagePreviews] = useState<string[]>([]); // Stores URLs of existing images
-  const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]); // Stores data URLs of newly selected files for preview
-  const [primaryImageMarker, setPrimaryImageMarker] = useState<string | number | null>(null); // URL for existing, index for new
-
+  const [productData, setProductData] = useState<Product | null>(null);
+  const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]);
+  const [currentImagePreviews, setCurrentImagePreviews] = useState<string[]>([]);
+  const [primaryImageMarker, setPrimaryImageMarker] = useState<string | number | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [availableSubCategories, setAvailableSubCategories] = useState<string[]>([]);
+  
+  const isSaveDisabled = !productData || (
+    !form.formState.isValid || 
+    isSubmitting || 
+    (!form.formState.isDirty && primaryImageMarker === productData.primary_image_path) || 
+    (form.getValues('imageFiles')?.length === 0 && newImagePreviews.length === 0 && !currentImagePreviews.length)
+  );
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
     defaultValues: {
-      name: '',
-      category: '',
-      subCategory: '',
-      description: '',
-      price: undefined,
-      stockQuantity: undefined,
+      name: "",
+      category: "",
+      subCategory: "",
+      description: "",
+      price: 0,
+      stockQuantity: 0,
       isBestSeller: false,
-      imageFiles: null,
-    },
+      imageFiles: null
+    }
   });
 
-  const selectedCategory = form.watch('category');
-  const watchedIsBestSeller = form.watch('isBestSeller');
-
   useEffect(() => {
-    if (selectedCategory) {
-      if (selectedCategory === 'Custom Prints') {
-        setAvailableSubCategories([]);
-        form.setValue('subCategory', '', { shouldValidate: true });
-      } else {
-        const subs = getSubCategories(selectedCategory as Category);
-        setAvailableSubCategories(subs);
-        const currentSubCategory = form.getValues('subCategory');
-        if (currentSubCategory && !subs.includes(currentSubCategory)) {
-           form.setValue('subCategory', '', { shouldValidate: true });
-        } else if (!currentSubCategory && productData?.category !== selectedCategory) {
-            form.setValue('subCategory', '', { shouldValidate: true });
-        }
-      }
-    } else {
-      setAvailableSubCategories([]);
-      form.setValue('subCategory', '');
-    }
-  }, [selectedCategory, form, productData]);
-
-
-  useEffect(() => {
-     if (!productId) {
-         setError("Product ID not found in URL.");
-         setIsLoadingProduct(false);
-         return;
-     }
     async function fetchProduct() {
-      setIsLoadingProduct(true);
-      setError(null);
       try {
-         const currentProduct = await getProductById(productId);
-         if (currentProduct) {
-           setProductData(currentProduct);
-           form.reset({
-             name: currentProduct.name,
-             category: currentProduct.category,
-             subCategory: currentProduct.subcategory ?? '',
-             description: currentProduct.description ?? '',
-             price: currentProduct.price,
-             stockQuantity: currentProduct.stock_quantity,
-             isBestSeller: currentProduct.is_best_seller,
-             imageFiles: null, // Reset file input
-           });
-            // Process image URLs to ensure they're absolute
-            const processImageUrl = (url: string) => {
-                if (!url) return null;
-                if (url.startsWith('http://') || url.startsWith('https://')) {
-                    return url;
-                }
-                // Ensure the URL starts with a forward slash
-                return url.startsWith('/') ? url : `/${url}`;
-            };
+        const currentProduct = await getProductById(productId);
+        if (!currentProduct) {
+          setError("Product not found");
+          return;
+        }
+        setProductData(currentProduct);
+        
+        // Set initial image previews and primary marker
+        const orderedInitialImages = [currentProduct.primary_image_path, ...currentProduct.image_paths.filter((url: string) => url !== currentProduct.primary_image_path)].filter(Boolean) as string[];
+        setCurrentImagePreviews(orderedInitialImages);
+        setPrimaryImageMarker(currentProduct.primary_image_path);
+        
+        // Reset form with current values
+        form.reset({
+          name: currentProduct.name,
+          category: currentProduct.category,
+          subCategory: currentProduct.subcategory || '',
+          description: currentProduct.description || '',
+          price: currentProduct.price,
+          stockQuantity: currentProduct.stock_quantity,
+          isBestSeller: currentProduct.is_best_seller,
+          imageFiles: null
+        });
 
-            // Order existing images: primary first, then others
-            const orderedExistingImages = [
-                ...(currentProduct.primary_image_path ? [processImageUrl(currentProduct.primary_image_path)] : []), 
-                ...(currentProduct.image_paths || [])
-                    .filter(url => url !== currentProduct.primary_image_path)
-                    .map(processImageUrl)
-            ].filter(Boolean) as string[]; // Filter out null/undefined
+        // Set category to trigger sub-category list update
+        setSelectedCategory(currentProduct.category);
 
-            console.log('Ordered images:', orderedExistingImages);
-            setCurrentImagePreviews(orderedExistingImages);
-            const primaryUrl = currentProduct.primary_image_path ? processImageUrl(currentProduct.primary_image_path) : null;
-            setPrimaryImageMarker(primaryUrl || (orderedExistingImages.length > 0 ? orderedExistingImages[0] : null));
-            setNewImagePreviews([]); // Clear any new previews from previous states
-
-             if (currentProduct.category) {
-                if (currentProduct.category === 'Custom Prints') {
-                    setAvailableSubCategories([]);
-                } else {
-                    setAvailableSubCategories(getSubCategories(currentProduct.category as Category));
-                }
-             }
-         } else {
-           setError(`Product with ID ${productId} not found.`);
-         }
-      } catch (err) {
-        console.error("Error fetching product:", err);
-        setError(err instanceof Error ? err.message : "Failed to load product data.");
+      } catch (error) {
+        setError("Error loading product");
+        console.error(error);
       } finally {
         setIsLoadingProduct(false);
       }
     }
     fetchProduct();
   }, [productId, form]);
+
+  useEffect(() => {
+    if (selectedCategory) {
+      setAvailableSubCategories(getSubCategories(selectedCategory as Category));
+    }
+  }, [selectedCategory]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -229,7 +188,7 @@ export default function EditProductPage() {
       setNewImagePreviews([]);
       // Restore current images and primary marker
       if (productData) {
-        const orderedInitialImages = [productData.primary_image_path, ...(productData.image_paths || []).filter((url: string) => url !== productData.primary_image_path)].filter(Boolean) as string[];
+        const orderedInitialImages = [productData.primary_image_path, ...productData.image_paths.filter((url: string) => url !== currentProduct.primary_image_path)].filter(Boolean) as string[];
         setCurrentImagePreviews(orderedInitialImages);
         setPrimaryImageMarker(productData.primary_image_path);
       }
@@ -239,7 +198,7 @@ export default function EditProductPage() {
 
   const removeNewPreviewImage = (index: number) => {
     const currentFiles = form.getValues('imageFiles') || [];
-    const updatedFiles = currentFiles.filter((_, i) => i !== index);
+    const updatedFiles = currentFiles.filter((_: any, i: number) => i !== index);
     form.setValue('imageFiles', updatedFiles.length > 0 ? updatedFiles : null, { shouldValidate: true });
 
     const updatedPreviewUrls = newImagePreviews.filter((_, i) => i !== index);
@@ -247,7 +206,7 @@ export default function EditProductPage() {
 
     if (updatedFiles.length === 0) { // All new previews removed, revert to current images
         if (productData) {
-            const orderedInitialImages = [productData.primary_image_path, ...(productData.image_paths || []).filter((url: string) => url !== productData.primary_image_path)].filter(Boolean) as string[];
+            const orderedInitialImages = [productData.primary_image_path, ...productData.image_paths.filter((url: string) => url !== productData.primary_image_path)].filter(Boolean) as string[];
             setCurrentImagePreviews(orderedInitialImages);
             setPrimaryImageMarker(productData.primary_image_path);
         }
@@ -276,7 +235,6 @@ export default function EditProductPage() {
       form.setValue('name', form.getValues('name'), { shouldDirty: true }); 
   }
 
-
   const onSubmit: SubmitHandler<ProductFormValues> = async (values) => {
     if (!productId || !productData) {
        toast({ variant: "destructive", title: "Error", description: "Product data is missing." });
@@ -292,7 +250,7 @@ export default function EditProductPage() {
         if (key !== 'imageFiles' && values[key] !== undefined) {
              const formValue = values[key];
              const productValue = (productData as any)[key];
-             // Explicitly check boolean `isBestSeller`
+             // Explicitly check boolean `is_best_seller`
              if (key === 'isBestSeller' && formValue !== (productValue || false)) {
                   (dataToUpdate as any)[key] = formValue;
                   hasChanges = true;
@@ -307,7 +265,6 @@ export default function EditProductPage() {
         dataToUpdate.subCategory = ''; // Ensure subCategory is cleared for Custom Prints
         if (productData.subcategory) hasChanges = true; // Only mark as change if it was previously set
     }
-
 
     const newFiles = form.getValues('imageFiles');
 
@@ -328,14 +285,13 @@ export default function EditProductPage() {
         hasChanges = true;
     }
 
-
     if (!hasChanges) {
         toast({ title: "No Changes", description: "No modifications detected to save." });
         setIsSubmitting(false);
         return;
     }
 
-     // Final check for subCategory validity
+    // Final check for subCategory validity
     const finalCategory = dataToUpdate.category || productData.category;
     if (finalCategory && finalCategory !== 'Custom Prints') {
         const finalSubCategory = dataToUpdate.subCategory === undefined ? productData.subcategory : dataToUpdate.subCategory;
@@ -345,58 +301,41 @@ export default function EditProductPage() {
              return;
         }
         const validSubCategories = getSubCategories(finalCategory as Category);
-        if (!validSubCategories.includes(finalSubCategory as any)) {
+        if (!validSubCategories.includes(finalSubCategory)) {
             form.setError("subCategory", {type: "manual", message: "Selected sub-category is not valid for the chosen category."});
             setIsSubmitting(false);
             return;
         }
     }
 
-
     try {
-      // Ensure all required fields are present for UpdateProductData
-      const updatePayload: UpdateProductData = {
-        name: dataToUpdate.name ?? productData.name,
-        category: dataToUpdate.category ?? productData.category,
-        description: dataToUpdate.description ?? productData.description ?? '',
-        price: dataToUpdate.price ?? productData.price,
-        stockQuantity: dataToUpdate.stockQuantity ?? productData.stock_quantity,
-        subCategory: (dataToUpdate.subCategory ?? productData.subcategory) !== undefined
-          ? String(dataToUpdate.subCategory ?? productData.subcategory)
-          : '', // Always a string, never undefined
-        isBestSeller: Boolean(dataToUpdate.isBestSeller ?? productData.is_best_seller ?? false),
-        imageFiles: dataToUpdate.imageFiles ?? null,
-        newPrimaryImageIndexForUpload: dataToUpdate.newPrimaryImageIndexForUpload,
-        makeExistingImagePrimary: dataToUpdate.makeExistingImagePrimary,
-      };
+        await updateProduct(productId, {
+            ...dataToUpdate, 
+            name: dataToUpdate.name || productData.name,
+            category: dataToUpdate.category || productData.category,
+            subCategory: (dataToUpdate.subCategory !== undefined ? String(dataToUpdate.subCategory) : productData.subcategory) || '',
+            description: dataToUpdate.description || productData.description || '',
+            price: dataToUpdate.price || productData.price,
+            stockQuantity: dataToUpdate.stockQuantity || productData.stock_quantity,
+            isBestSeller: Boolean(dataToUpdate.isBestSeller ?? productData.is_best_seller ?? false)
+        });
 
-      await updateProduct(productId, updatePayload);
-      toast({
-        title: "Product Updated",
-        description: `Product "${values.name || productData.name}" has been successfully updated.`,
-      });
-      router.push('/admin/inventory');
+        toast({ title: "Success", description: "Product updated successfully." });
+        router.push('/admin/inventory');
     } catch (error) {
-      console.error("Error updating product:", error);
-      toast({
-        variant: "destructive",
-        title: "Error Updating Product",
-        description: error instanceof Error ? error.message : "An unexpected error occurred.",
-      });
+        console.error('Error updating product:', error);
+        toast({ variant: "destructive", title: "Error", description: "Failed to update product. Please try again." });
     } finally {
-      setIsSubmitting(false);
+        setIsSubmitting(false);
     }
   };
-  
-  const isSaveDisabled = isSubmitting || !form.formState.isDirty || !form.formState.isValid;
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center gap-4">
-        <Link href="/admin/inventory" className="inline-block">
-          <Button variant="outline" size="icon" className="h-8 w-8">
+    <div className="container py-10 space-y-6">
+      <div className="flex flex-col md:flex-row gap-4 items-center">
+        <Link href="/admin/inventory">
+          <Button variant="outline" size="icon">
             <ArrowLeft className="h-4 w-4" />
-            <span className="sr-only">Back to Inventory</span>
           </Button>
         </Link>
         <h1 className="text-2xl md:text-3xl font-bold">Edit Product</h1>
@@ -438,7 +377,6 @@ export default function EditProductPage() {
                       </FormControl>
                     </FormItem>
                 )} />
-
 
                 <FormField
                   control={form.control}

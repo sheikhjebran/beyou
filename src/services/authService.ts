@@ -10,8 +10,9 @@ interface LoginResponse {
 }
 
 export async function signInWithEmailPassword(email: string, password: string): Promise<LoginResponse> {
+  let response;
   try {
-    const response = await fetch('/api/auth/login', {
+    response = await fetch('/api/auth/login', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

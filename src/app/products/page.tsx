@@ -34,8 +34,8 @@ function ProductsContent() {
             setLoading(true);
             setError(null);
             try {
-                const fetchedProducts = await getProducts();
-                setProducts(fetchedProducts);
+                const result = await getProducts(1, 50); // Get first 50 products
+                setProducts(result.products);
             } catch (err) {
                 console.warn("Failed to load products on products page:", err);
                 setError(err instanceof Error ? err.message : "An unknown error occurred while fetching products.");
@@ -66,8 +66,8 @@ function ProductsContent() {
         
         // Sort the filtered products to show out-of-stock items last
         return filtered.sort((a, b) => {
-            const aInStock = a.quantity > 0;
-            const bInStock = b.quantity > 0;
+            const aInStock = a.stockQuantity > 0;
+            const bInStock = b.stockQuantity > 0;
             if (aInStock && !bInStock) return -1; // a comes first
             if (!aInStock && bInStock) return 1;  // b comes first
             return 0; // maintain original order if both are in/out of stock

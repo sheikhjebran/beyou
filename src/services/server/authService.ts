@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import { v4 as uuidv4 } from 'uuid';
 import pool, { executeQuery } from '@/lib/server/mysql';
 import { uploadImage, deleteImage } from '@/lib/imageStorage';
 
@@ -6,7 +7,7 @@ import { uploadImage, deleteImage } from '@/lib/imageStorage';
 export async function verifyUser(userId: string): Promise<User> {
     try {
         const [users] = await executeQuery<any[]>(
-            'SELECT id, email, display_name, photo_url FROM users WHERE id = ?',
+            'SELECT id, email, display_name, profile_image_path, role, created_at, updated_at FROM users WHERE id = ?',
             [userId]
         );
 
@@ -18,8 +19,11 @@ export async function verifyUser(userId: string): Promise<User> {
         return {
             id: user.id,
             email: user.email,
-            displayName: user.display_name,
-            photoURL: user.photo_url
+            display_name: user.display_name,
+            profile_image_path: user.profile_image_path,
+            role: user.role,
+            created_at: user.created_at.toISOString(),
+            updated_at: user.updated_at.toISOString()
         };
     } catch (error) {
         console.error('Error verifying user:', error);
@@ -27,13 +31,18 @@ export async function verifyUser(userId: string): Promise<User> {
     }
 }
 
+// Import database types
+import { DbUser } from '@/types/database';
+
 // Define user interface
 export interface User {
-    id: string;
-    email: string;
-    displayName?: string | null;
-    photoURL?: string | null;
-    token?: string;
+    id: string;               // varchar(36)
+    email: string;           // varchar(255)
+    display_name: string | null;  // Using exact DB field name
+    profile_image_path: string | null;  // Using exact DB field name
+    role: 'admin' | 'user';  // enum('admin', 'user')
+    created_at: string;     // timestamp
+    updated_at: string;     // timestamp
 }
 
 // Sign Up with Email and Password
@@ -55,22 +64,24 @@ export async function signUpWithEmailPassword(email: string, password: string): 
         // Hash password
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Create user
-        const [result] = await connection.query(
-            `INSERT INTO users (email, password_hash) 
-             VALUES (?, ?)`,
-            [email, hashedPassword]
+        // Create user with UUID
+        const userId = uuidv4();
+        await connection.query(
+            `INSERT INTO users (id, email, password_hash, role, created_at, updated_at) 
+             VALUES (?, ?, ?, ?, NOW(), NOW())`,
+            [userId, email, hashedPassword, 'user']
         );
-
-        const userId = (result as any).insertId;
 
         await connection.commit();
 
         return {
             id: userId,
             email,
-            displayName: null,
-            photoURL: null
+            display_name: null,
+            profile_image_path: null,
+            role: 'user',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
         };
     } catch (error) {
         await connection.rollback();
@@ -106,8 +117,11 @@ export async function signInWithEmailPassword(email: string, password: string): 
         return {
             id: user.id,
             email: user.email,
-            displayName: user.display_name,
-            photoURL: user.photo_url
+            display_name: user.display_name,
+            profile_image_path: user.profile_image_path,
+            role: user.role,
+            created_at: user.created_at.toISOString(),
+            updated_at: user.updated_at.toISOString()
         };
     } catch (error) {
         console.warn("Sign-in attempt failed:", error);
@@ -120,7 +134,7 @@ export async function signInWithEmailPassword(email: string, password: string): 
     }
 }
 
-export async function updateUserProfile(userId: string, data: { displayName?: string, photoFile?: File }): Promise<void> {
+export async function updateUserProfile(userId: string, data: { display_name?: string, photo_file?: File }): Promise<void> {
     const connection = await pool.getConnection();
     try {
         await connection.beginTransaction();
@@ -128,30 +142,33 @@ export async function updateUserProfile(userId: string, data: { displayName?: st
         const updateFields = [];
         const updateValues = [];
 
-        if (data.displayName !== undefined) {
+        if (data.display_name !== undefined) {
             updateFields.push('display_name = ?');
-            updateValues.push(data.displayName);
+            updateValues.push(data.display_name);
         }
 
-        if (data.photoFile) {
+        if (data.photo_file) {
             // Get current photo URL to delete old image
             const [users] = await connection.query(
-                'SELECT photo_url FROM users WHERE id = ?',
+                'SELECT profile_image_path FROM users WHERE id = ?',
                 [userId]
             );
             
             const user = (users as any[])[0];
-            if (user?.photo_url) {
-                await deleteImage(user.photo_url);
+            if (user?.profile_image_path) {
+                await deleteImage(user.profile_image_path);
             }
 
             // Upload new image
-            const uploadedImage = await uploadImage(data.photoFile, `users/${userId}`);
-            updateFields.push('photo_url = ?');
+            const uploadedImage = await uploadImage(data.photo_file, `users/${userId}`);
+            updateFields.push('profile_image_path = ?');
             updateValues.push(uploadedImage.path);
         }
 
         if (updateFields.length > 0) {
+            // Add updated_at timestamp
+            updateFields.push('updated_at = NOW()');
+            
             updateValues.push(userId);
             await connection.query(
                 `UPDATE users 
@@ -187,8 +204,11 @@ export async function getUserById(userId: string): Promise<User | null> {
         return {
             id: user.id,
             email: user.email,
-            displayName: user.display_name,
-            photoURL: user.photo_url
+            display_name: user.display_name,
+            profile_image_path: user.profile_image_path,
+            role: user.role,
+            created_at: user.created_at.toISOString(),
+            updated_at: user.updated_at.toISOString()
         };
     } catch (error) {
         console.warn("Error fetching user:", error);

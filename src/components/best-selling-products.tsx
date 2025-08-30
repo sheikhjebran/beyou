@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getBestSellingProducts } from '@/services/productService';
+import { getProducts } from '@/services/productService';
 import { Product } from '@/types/product';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from 'lucide-react';
@@ -16,8 +16,8 @@ export default function BestSellingProducts() {
   useEffect(() => {
     async function fetchProducts() {
       try {
-        const fetchedProducts = await getBestSellingProducts();
-        setProducts(fetchedProducts);
+        const result = await getProducts(1, 10, { isBestSeller: true });
+        setProducts(result.products);
       } catch (err) {
         console.error('Failed to fetch best selling products:', err);
         setError('Failed to load best selling products. Please try again later.');

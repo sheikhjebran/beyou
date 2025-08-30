@@ -33,7 +33,7 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
     setSelectedQuantity(prev => {
       const newQuantity = prev + amount;
       if (newQuantity < 1) return 1;
-      const maxQty = product ? (product.quantity > 0 ? Math.min(product.quantity, 100) : 0) : 100;
+      const maxQty = product ? (product.stockQuantity > 0 ? Math.min(product.stockQuantity, 100) : 0) : 100;
       if (newQuantity > maxQty && maxQty > 0) return maxQty;
       if (newQuantity > 100) return 100;
       return newQuantity;
@@ -47,7 +47,7 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
       return;
     }
     const numValue = parseInt(value, 10);
-    const maxQty = product ? (product.quantity > 0 ? Math.min(product.quantity, 100) : 0) : 100;
+    const maxQty = product ? (product.stockQuantity > 0 ? Math.min(product.stockQuantity, 100) : 0) : 100;
 
     if (!isNaN(numValue) && numValue >= 1 && numValue <= maxQty) {
       setSelectedQuantity(numValue);
@@ -99,16 +99,29 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
     }
   };
 
-  // Reorder display images to ensure primary is first
+  // Reorder display images to ensure primary is first and validate URLs
   const displayImages = React.useMemo(() => {
-    if (!product) return ['https://placehold.co/600x600.png?text=No+Image'];
-    const imageUrls = product.imageUrls || [];
+    if (!product) return ['/images/placeholder.png'];
+    
+    const validateUrl = (url: string) => {
+      if (!url) return false;
+      try {
+        new URL(url.startsWith('http') ? url : `http://${url}`);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    const imageUrls = (product.imageUrls || []).filter(validateUrl);
     const primaryUrl = product.primaryImageUrl;
-    if (primaryUrl && primaryUrl !== 'https://placehold.co/400x300.png') {
-        const otherImages = imageUrls.filter(url => url !== primaryUrl);
-        return [primaryUrl, ...otherImages];
+    
+    if (primaryUrl && validateUrl(primaryUrl)) {
+      const otherImages = imageUrls.filter(url => url !== primaryUrl);
+      return [primaryUrl, ...otherImages];
     }
-    return imageUrls.length > 0 ? imageUrls : ['https://placehold.co/600x600.png?text=No+Image'];
+    
+    return imageUrls.length > 0 ? imageUrls : ['/images/placeholder.png'];
   }, [product]);
 
   const currentDisplayImageSrc = displayImages[currentDisplayImageIndex];
@@ -132,14 +145,13 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
             sizes="(max-width: 767px) 90vw, 45vw"
             imgClassName={cn(
               "object-cover",
-              product.quantity === 0 && "blur-sm"
+              product.stockQuantity === 0 && "blur-sm"
             )}
             priority={true}
             key={currentDisplayImageSrc}
             data-ai-hint="product fashion beauty"
-            loadingText="Loading image..."
           />
-          {product.quantity === 0 && (
+          {product.stockQuantity === 0 && (
             <>
               <div className="absolute inset-0 bg-black/30 z-10"></div>
               <Badge
@@ -184,7 +196,7 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                 }`}
                 aria-label={`View image ${index + 1}`}
               >
-                <Image
+                <LoadingImage
                   src={imgUrl}
                   alt={`${product.name} thumbnail ${index + 1}`}
                   width={80}
@@ -213,14 +225,14 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
             <h3 className="font-semibold text-foreground mb-1">Category:</h3>
-            <Link href={`/products?category=${encodeURIComponent(product.category)}`} passHref legacyBehavior>
+            <Link href={`/products?category=${encodeURIComponent(product.category)}`}>
               <Badge variant="outline" className="cursor-pointer hover:bg-accent">{product.category}</Badge>
             </Link>
           </div>
           {product.subCategory && product.subCategory.length > 0 && (
             <div>
               <h3 className="font-semibold text-foreground mb-1">Sub-Category:</h3>
-              <Link href={`/products?category=${encodeURIComponent(product.category)}&subCategory=${encodeURIComponent(product.subCategory)}`} passHref legacyBehavior>
+              <Link href={`/products?category=${encodeURIComponent(product.category)}&subCategory=${encodeURIComponent(product.subCategory)}`}>
                 <Badge variant="outline" className="cursor-pointer hover:bg-accent">{product.subCategory}</Badge>
               </Link>
             </div>
@@ -230,15 +242,15 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
         <div className="space-y-2">
           <Label htmlFor={`quantity-${product.id}`} className="text-base font-medium">Quantity</Label>
           <div className="flex items-center space-x-2">
-            <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={() => handleQuantityChange(-1)} disabled={selectedQuantity <= 1 || product.quantity === 0} aria-label="Decrease quantity">
+            <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={() => handleQuantityChange(-1)} disabled={selectedQuantity <= 1 || product.stockQuantity === 0} aria-label="Decrease quantity">
               <Minus className="h-4 w-4" />
             </Button>
             <Input id={`quantity-${product.id}`} type="number" value={selectedQuantity} onChange={handleInputChange} min="1"
-              max={product.quantity > 0 ? Math.min(product.quantity, 100) : 0}
+              max={product.stockQuantity > 0 ? Math.min(product.stockQuantity, 100) : 0}
               className="h-9 w-20 text-center text-base" aria-label="Product quantity"
-              disabled={product.quantity === 0} />
+              disabled={product.stockQuantity === 0} />
             <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={() => handleQuantityChange(1)}
-              disabled={selectedQuantity >= (product.quantity > 0 ? Math.min(product.quantity, 100) : 0) || product.quantity === 0}
+              disabled={selectedQuantity >= (product.stockQuantity > 0 ? Math.min(product.stockQuantity, 100) : 0) || product.stockQuantity === 0}
               aria-label="Increase quantity">
               <Plus className="h-4 w-4" />
             </Button>
@@ -249,7 +261,7 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
           <Textarea id={`note-${product.id}`} placeholder="Add a special request or note for this item..." value={note} onChange={(e) => setNote(e.target.value)} className="min-h-[80px] resize-none text-sm" disabled={product.quantity === 0} />
         </div>
         <div className="space-y-3">
-          <Button className="w-full text-base py-3" aria-label={`Add ${product.name} to cart`} onClick={handleAddToCart} disabled={product.quantity === 0 || selectedQuantity > product.quantity}>
+          <Button className="w-full text-base py-3" aria-label={`Add ${product.name} to cart`} onClick={handleAddToCart} disabled={product.stockQuantity === 0 || selectedQuantity > product.stockQuantity}>
             <ShoppingBag className="mr-2 h-5 w-5" /> Add to Cart
           </Button>
           <Button

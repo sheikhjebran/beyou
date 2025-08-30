@@ -16,6 +16,7 @@ npm install
 # To run the project
 ```bash
 npm run dev
+
 ```
 
 Email: admin@beyou.com

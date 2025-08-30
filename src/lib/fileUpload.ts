@@ -12,24 +12,43 @@ try {
   console.error('Error creating uploads directory:', error);
 }
 
-export async function saveFile(file: File, subDirectory: string = ''): Promise<string> {
+export type FileUploadResult = {
+  success: boolean;
+  path?: string;
+  error?: string;
+};
+
+export async function saveFile(subDirectory: string, file: File): Promise<FileUploadResult> {
   try {
+    console.log('Saving file:', file.name, 'to directory:', subDirectory);
     const fileExtension = file.name.split('.').pop() || '';
     const fileName = `${uuidv4()}.${fileExtension}`;
     const fullDirectory = path.join(UPLOAD_DIR, subDirectory);
     
     // Create subdirectory if it doesn't exist
+    console.log('Creating directory:', fullDirectory);
     await mkdir(fullDirectory, { recursive: true });
     
     const filePath = path.join(fullDirectory, fileName);
+    console.log('Writing file to:', filePath);
+    
     const buffer = Buffer.from(await file.arrayBuffer());
     await writeFile(filePath, buffer);
     
+    const publicPath = `/uploads/${subDirectory}/${fileName}`;
+    console.log('File saved successfully. Public path:', publicPath);
+    
     // Return the path relative to the public directory
-    return `/uploads/${subDirectory}/${fileName}`;
+    return {
+      success: true,
+      path: publicPath
+    };
   } catch (error) {
     console.error('Error saving file:', error);
-    throw new Error('Failed to save file');
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to save file'
+    };
   }
 }
 

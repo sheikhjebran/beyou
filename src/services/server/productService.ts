@@ -1,446 +1,437 @@
 import pool, { executeQuery } from '@/lib/server/mysql';
 import { Product } from '@/types/product';
+import { saveFile, deleteFile } from '@/lib/fileUpload';
+import { v4 as uuidv4 } from 'uuid';
 
-const DEFAULT_PRIMARY_IMAGE_URL = 'https://placehold.co/400x300.png';
+// Constants
+const DEFAULT_PRIMARY_IMAGE_URL = '/images/placeholder.png';
 
-// Type for updating product images
-export type UpdateProductImageData = {
-    imageFiles?: File[] | null;
-    newPrimaryImageIndexForUpload?: number;
-    makeExistingImagePrimary?: string;
+// Types
+type ImageInfo = { path: string; isPrimary: boolean };
+const formatPath = (path: string | null): string => {
+    if (!path) return DEFAULT_PRIMARY_IMAGE_URL;
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+        return path;
+    }
+    // Ensure path starts with /uploads/ and remove any duplicate slashes
+    const normalizedPath = path.replace(/^\/?(uploads\/)?/, '');
+    return `/uploads/${normalizedPath}`;
 };
 
-// Type for adding new products
-export type AddProductData = {
-    name: string;
-    category: string;
-    subCategory: string;
-    description: string;
-    price: number;
-    stockQuantity: number;
-    imageFiles?: File[];
+const sanitizeJsonString = (str: string | null): string | null => {
+    if (!str) return null;
+    const trimmed = str.trim();
+    if (!trimmed) return null;
+    return trimmed.startsWith('[') ? trimmed : `[${trimmed}]`;
 };
 
-// Type for updating products
-export type UpdateProductData = {
-    name: string;
-    category: string;
-    subCategory: string;
-    description: string;
-    price: number;
-    quantity: number;
-    imageUpdateData?: UpdateProductImageData;
-};
-
-// Type for today's sales summary
-export type TodaysSalesSummary = {
-    ordersToday: number;
-    salesTodayAmount: number;
-};
-
-// Type for product sales summary (for analytics)
-export type ProductSaleSummary = {
-    productId: string;
-    productName: string;
-    totalQuantitySold: number;
-};
-
-// Type for top sales by quantity in a single order
-export type TopSaleByQuantity = {
-    id: string;
-    productName: string;
-    quantitySold: number;
-    saleDate: string;
-};
-
-// Type for product revenue summary (for analytics)
-export type ProductRevenueSummary = {
-    productId: string;
-    productName: string;
-    totalRevenue: number;
-};
-
-export async function getProducts(): Promise<Product[]> {
+// Image Processing Functions (Depends on Base Utilities)
+const parseJsonToImages = (jsonString: string | null): ImageInfo[] => {
+    const validJson = sanitizeJsonString(jsonString);
+    if (!validJson) return [];
+    
     try {
-        console.log('Attempting to connect to database and fetch products...');
+        const parsed = JSON.parse(validJson) as ImageInfo[];
+        return Array.isArray(parsed) ? 
+            parsed.filter(img => img && typeof img.path === 'string') : 
+            [];
+    } catch (error) {
+        console.error('Error parsing image JSON:', error);
+        return [];
+    }
+};
+
+const formatImagePaths = (images: ImageInfo[]): string[] => {
+    return images.map(img => formatPath(img.path));
+};
+
+// Main Image Data Processing (Depends on All Above)
+const getImageData = (imageString: string | null, primaryImagePath?: string | null): { primary_image_path: string; image_paths: string[] } => {
+    console.log('Getting image data:', { imageString, primaryImagePath });
+    
+    const images = parseJsonToImages(imageString);
+    console.log('Parsed images:', images);
+
+    // If we have a primary_image_path from the database, use it
+    if (primaryImagePath) {
+        const primary = formatPath(primaryImagePath);
+        const allPaths = formatImagePaths(images);
         
-        const query = `
-            SELECT p.*, 
-                GROUP_CONCAT(pi.image_path) as image_paths,
-                (SELECT image_path FROM product_images WHERE product_id = p.id AND is_primary = true LIMIT 1) as primary_image
+        // Ensure primary image is first in the array
+        const uniqueUrls = Array.from(new Set([primary, ...allPaths]));
+        return {
+            primary_image_path: primary,
+            image_paths: uniqueUrls
+        };
+    }
+
+    // If we have images but no primary_image_path
+    if (images.length > 0) {
+        const primaryImage = images.find(img => img.isPrimary) || images[0];
+        const allPaths = formatImagePaths(images);
+        
+        return {
+            primary_image_path: formatPath(primaryImage.path),
+            image_paths: allPaths
+        };
+    }
+
+    // Fallback to default image
+    return {
+        primary_image_path: DEFAULT_PRIMARY_IMAGE_URL,
+        image_paths: [DEFAULT_PRIMARY_IMAGE_URL]
+    };
+};
+
+// Database Functions
+// Types for pagination
+export type PaginatedProducts = {
+    products: Product[];
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+};
+
+export async function getProducts(page: number = 1, pageSize: number = 10, filters?: {
+    category?: string;
+    subCategory?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    isBestSeller?: boolean;
+}): Promise<PaginatedProducts> {
+    const connection = await pool.getConnection();
+    try {
+        // Calculate offset
+        const offset = (page - 1) * pageSize;
+
+        // Build WHERE clause based on filters
+        const whereConditions: string[] = [];
+        const whereParams: any[] = [];
+        
+        if (filters) {
+            if (filters.category) {
+                whereConditions.push('p.category = ?');
+                whereParams.push(filters.category);
+            }
+            if (filters.subCategory) {
+                whereConditions.push('p.subcategory = ?');
+                whereParams.push(filters.subCategory);
+            }
+            if (filters.minPrice !== undefined) {
+                whereConditions.push('p.price >= ?');
+                whereParams.push(filters.minPrice);
+            }
+            if (filters.maxPrice !== undefined) {
+                whereConditions.push('p.price <= ?');
+                whereParams.push(filters.maxPrice);
+            }
+            if (filters.isBestSeller !== undefined) {
+                whereConditions.push('p.is_best_seller = ?');
+                whereParams.push(filters.isBestSeller);
+            }
+        }
+
+        const whereClause = whereConditions.length > 0 
+            ? 'WHERE ' + whereConditions.join(' AND ')
+            : '';
+
+        // Get total count for pagination
+        const [countResult] = await connection.query(
+            `SELECT COUNT(DISTINCT p.id) as total 
+             FROM products p 
+             ${whereClause}`,
+            whereParams
+        ) as [any[], any];
+
+        const total = countResult[0].total;
+        const totalPages = Math.ceil(total / pageSize);
+
+        // Get paginated products with images
+        const queryParams = [...whereParams, offset, pageSize];
+        const [rows] = await connection.query(`
+            SELECT 
+                p.*,
+                p.primary_image_path,
+                CONCAT(
+                    '[',
+                    GROUP_CONCAT(
+                        CONCAT('{"path":"', TRIM(pi.image_path), '","isPrimary":', IF(pi.is_primary, 'true', 'false'), '}')
+                        ORDER BY pi.is_primary DESC, pi.created_at ASC
+                        SEPARATOR ','
+                    ),
+                    ']'
+                ) as images
             FROM products p
             LEFT JOIN product_images pi ON p.id = pi.product_id
+            ${whereClause}
             GROUP BY p.id
-            ORDER BY p.updated_at DESC
-        `;
+            ORDER BY p.created_at DESC
+            LIMIT ?, ?
+        `, queryParams) as [any[], any];
 
-        console.log('Executing query:', query);
-        
-        const rows = await executeQuery<any[]>(query);
+        const products = rows.map(row => {
+            const { primary_image_path, image_paths } = getImageData(row.images, row.primary_image_path);
+            
+            return {
+                id: row.id,
+                name: row.name,
+                category: row.category,
+                subcategory: row.subcategory || '',
+                description: row.description,
+                price: Number(row.price),
+                stock_quantity: Number(row.stock_quantity) || 0,
+                is_best_seller: Boolean(row.is_best_seller),
+                primary_image_path: primary_image_path,
+                image_paths: image_paths,
+                created_at: row.created_at ? row.created_at.toISOString() : null,
+                updated_at: row.updated_at ? row.updated_at.toISOString() : null
+            };
+        });
 
-        if (!Array.isArray(rows)) {
-            throw new Error('Failed to fetch products: Invalid response format');
-        }
+        return {
+            products,
+            total,
+            page,
+            pageSize,
+            totalPages
+        };
+    } catch (error) {
+        console.warn("Warning during fetching products:", error);
+        return {
+            products: [],
+            total: 0,
+            page: 1,
+            pageSize,
+            totalPages: 0
+        };
+    } finally {
+        connection.release();
+    }
+}
 
-        return rows.map(row => ({
+export async function getProductById(id: string): Promise<Product | null> {
+    const connection = await pool.getConnection();
+    try {
+        const [rows] = await connection.query(`
+            SELECT 
+                p.*,
+                p.primary_image_path,
+                CONCAT(
+                    '[',
+                    GROUP_CONCAT(
+                        CONCAT('{"path":"', TRIM(pi.image_path), '","isPrimary":', IF(pi.is_primary, 'true', 'false'), '}')
+                        ORDER BY pi.is_primary DESC, pi.created_at ASC
+                        SEPARATOR ','
+                    ),
+                    ']'
+                ) as images
+            FROM products p
+            LEFT JOIN product_images pi ON p.id = pi.product_id
+            WHERE p.id = ?
+            GROUP BY p.id
+        `, [id]) as [any[], any];
+
+        if (!rows.length) return null;
+
+        const row = rows[0];
+        const { primary_image_path, image_paths } = getImageData(row.images, row.primary_image_path);
+
+        return {
             id: row.id,
-            name: row.name || 'Unnamed Product',
-            category: row.category || 'Other',
-            subCategory: row.subcategory || 'Miscellaneous',
-            description: row.description || 'No description available.',
-            price: Number(row.price) || 0,
-            primaryImageUrl: row.primary_image || DEFAULT_PRIMARY_IMAGE_URL,
-            imageUrls: row.image_paths ? row.image_paths.split(',') : [],
-            stockQuantity: Number(row.stock_quantity) || 0,
-            isBestSeller: Boolean(row.is_best_seller),
-            createdAt: row.created_at ? row.created_at.toISOString() : new Date().toISOString(),
-            updatedAt: row.updated_at ? row.updated_at.toISOString() : new Date().toISOString()
-        }));
+            name: row.name,
+            category: row.category,
+            subcategory: row.subcategory || '',
+            description: row.description,
+            price: Number(row.price),
+            stock_quantity: Number(row.stock_quantity) || 0,
+            is_best_seller: Boolean(row.is_best_seller),
+            primary_image_path: primary_image_path,
+            image_paths: image_paths,
+            created_at: row.created_at ? row.created_at.toISOString() : null,
+            updated_at: row.updated_at ? row.updated_at.toISOString() : null
+        };
     } catch (error) {
-        console.error('Error in getProducts:', error);
-        throw new Error('Failed to fetch products: Database error');
-    }
-
-    return rows.map(row => ({
-        id: row.id,
-        name: row.name || 'Unnamed Product',
-        category: row.category || 'Other',
-        subCategory: row.sub_category || 'Miscellaneous',
-        description: row.description || 'No description available.',
-        price: Number(row.price) || 0,
-        primaryImageUrl: row.primary_image || DEFAULT_PRIMARY_IMAGE_URL,
-        imageUrls: row.image_paths ? row.image_paths.split(',') : [],
-        quantity: Number(row.quantity) || 0,
-        isBestSeller: Boolean(row.is_best_seller),
-        createdAt: row.created_at.toISOString(),
-        updatedAt: row.updated_at.toISOString()
-    }));
-}
-
-export async function getBestSellingProducts(): Promise<Product[]> {
-    const rows = await executeQuery<any[]>(`
-        SELECT p.*, 
-               GROUP_CONCAT(pi.image_path) as image_paths,
-               (SELECT image_path FROM product_images WHERE product_id = p.id AND is_primary = true LIMIT 1) as primary_image
-        FROM products p
-        LEFT JOIN product_images pi ON p.id = pi.product_id
-        WHERE p.is_best_seller = true
-        GROUP BY p.id
-        ORDER BY p.updated_at DESC
-    `);
-
-    return rows.map(row => ({
-        id: row.id,
-        name: row.name || 'Unnamed Product',
-        category: row.category || 'Other',
-        subCategory: row.sub_category || 'Miscellaneous',
-        description: row.description || 'No description available.',
-        price: Number(row.price) || 0,
-        primaryImageUrl: row.primary_image || DEFAULT_PRIMARY_IMAGE_URL,
-        imageUrls: row.image_paths ? row.image_paths.split(',') : [],
-        quantity: Number(row.quantity) || 0,
-        isBestSeller: true,
-        createdAt: row.created_at.toISOString(),
-        updatedAt: row.updated_at.toISOString()
-    }));
-}
-
-export async function getMostRecentProduct(): Promise<Product | null> {
-    const rows = await executeQuery<any[]>(`
-        SELECT p.*, 
-               GROUP_CONCAT(pi.image_path) as image_paths,
-               (SELECT image_path FROM product_images WHERE product_id = p.id AND is_primary = true LIMIT 1) as primary_image
-        FROM products p
-        LEFT JOIN product_images pi ON p.id = pi.product_id
-        GROUP BY p.id
-        ORDER BY p.created_at DESC
-        LIMIT 1
-    `);
-
-    if (rows.length === 0) {
+        console.error("Error fetching product by ID:", error);
         return null;
-    }
-
-    const row = rows[0];
-    return {
-        id: row.id,
-        name: row.name || 'Unnamed Product',
-        category: row.category || 'Other',
-        subCategory: row.sub_category || 'Miscellaneous',
-        description: row.description || 'No description available.',
-        price: Number(row.price) || 0,
-        primaryImageUrl: row.primary_image || DEFAULT_PRIMARY_IMAGE_URL,
-        imageUrls: row.image_paths ? row.image_paths.split(',') : [],
-        quantity: Number(row.quantity) || 0,
-        isBestSeller: Boolean(row.is_best_seller),
-        createdAt: row.created_at.toISOString(),
-        updatedAt: row.updated_at.toISOString()
-    };
-}
-
-export async function getProductById(productId: string): Promise<Product | null> {
-    const rows = await executeQuery<any[]>(`
-        SELECT p.*, 
-               GROUP_CONCAT(pi.image_path) as image_paths,
-               (SELECT image_path FROM product_images WHERE product_id = p.id AND is_primary = true LIMIT 1) as primary_image
-        FROM products p
-        LEFT JOIN product_images pi ON p.id = pi.product_id
-        WHERE p.id = ?
-        GROUP BY p.id
-    `, [productId]);
-
-    if (rows.length === 0) {
-        return null;
-    }
-
-    const row = rows[0];
-    return {
-        id: row.id,
-        name: row.name || 'Unnamed Product',
-        category: row.category || 'Other',
-        subCategory: row.sub_category || 'Miscellaneous',
-        description: row.description || 'No description available.',
-        price: Number(row.price) || 0,
-        primaryImageUrl: row.primary_image || DEFAULT_PRIMARY_IMAGE_URL,
-        imageUrls: row.image_paths ? row.image_paths.split(',') : [],
-        quantity: Number(row.quantity) || 0,
-        isBestSeller: Boolean(row.is_best_seller),
-        createdAt: row.created_at.toISOString(),
-        updatedAt: row.updated_at.toISOString()
-    };
-}
-
-export async function addProduct(productData: AddProductData): Promise<string> {
-    const connection = await pool.getConnection();
-    try {
-        await connection.beginTransaction();
-
-        // Insert product
-        const [result] = await connection.query(`
-            INSERT INTO products (
-                name, category, subcategory, description, price, 
-                stock_quantity, is_best_seller, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-        `, [
-            productData.name,
-            productData.category,
-            productData.subCategory,
-            productData.description,
-            productData.price,
-            productData.stockQuantity,
-            false // default is_best_seller to false for new products
-        ]);
-
-        const productId = (result as any).insertId;
-
-        // Insert images if provided
-        if (productData.imageFiles?.length) {
-            for (let i = 0; i < productData.imageFiles.length; i++) {
-                await connection.query(`
-                    INSERT INTO product_images (
-                        product_id, image_path, is_primary, created_at, updated_at
-                    ) VALUES (?, ?, ?, NOW(), NOW())
-                `, [
-                    productId,
-                    productData.imageFiles[i].name, // Store the image path
-                    i === 0 // First image is primary by default
-                ]);
-            }
-        }
-
-        await connection.commit();
-        return productId.toString();
-    } catch (error) {
-        await connection.rollback();
-        throw error;
     } finally {
         connection.release();
     }
 }
 
-export async function updateProduct(productId: string, productData: UpdateProductData): Promise<void> {
+export async function addProduct(product: Omit<Product, 'id' | 'created_at' | 'updated_at'>): Promise<Product | null> {
     const connection = await pool.getConnection();
     try {
         await connection.beginTransaction();
+        
+        const productId = uuidv4(); // Generate UUID for product
 
-        // Update product
+        // First insert the product
         await connection.query(`
-            UPDATE products 
-            SET name = ?, category = ?, subcategory = ?, description = ?, 
-                price = ?, stock_quantity = ?, updated_at = NOW()
-            WHERE id = ?
+            INSERT INTO products (
+                id,
+                name, 
+                category, 
+                subcategory,
+                description, 
+                price, 
+                stock_quantity,
+                is_best_seller,
+                primary_image_path
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
-            productData.name,
-            productData.category,
-            productData.subCategory,
-            productData.description,
-            productData.price,
-            productData.quantity,
-            productId
+            productId,
+            product.name,
+            product.category,
+            product.subcategory,
+            product.description,
+            product.price,
+            product.stock_quantity,
+            product.is_best_seller ? 1 : 0,
+            product.primary_image_path
         ]);
 
-        // Handle image updates if provided
-        if (productData.imageUpdateData) {
-            const { imageFiles, makeExistingImagePrimary, newPrimaryImageIndexForUpload } = productData.imageUpdateData;
+        // Insert image records
+        if (product.image_paths && product.image_paths.length > 0) {
+            const imageValues = product.image_paths.map((path) => [
+                uuidv4(), // Generate UUID for each image
+                productId,
+                path,
+                path === product.primary_image_path ? 1 : 0, // is_primary as tinyint
+                new Date(),
+                new Date()
+            ]);
 
-            // If making an existing image primary
-            if (makeExistingImagePrimary) {
-                await connection.query(`
-                    UPDATE product_images 
-                    SET is_primary = CASE 
-                        WHEN image_path = ? THEN true 
-                        ELSE false 
-                    END
-                    WHERE product_id = ?
-                `, [makeExistingImagePrimary, productId]);
-            }
-
-            // Upload new images if provided
-            if (imageFiles?.length) {
-                for (let i = 0; i < imageFiles.length; i++) {
-                    await connection.query(`
-                        INSERT INTO product_images (
-                            product_id, image_path, is_primary, created_at, updated_at
-                        ) VALUES (?, ?, ?, NOW(), NOW())
-                    `, [
-                        productId,
-                        imageFiles[i].name,
-                        i === (newPrimaryImageIndexForUpload || 0) && !makeExistingImagePrimary
-                    ]);
-                }
-            }
+            await connection.query(`
+                INSERT INTO product_images (
+                    id,
+                    product_id,
+                    image_path,
+                    is_primary,
+                    created_at,
+                    updated_at
+                ) VALUES ?
+            `, [imageValues]);
         }
 
         await connection.commit();
+        return await getProductById(productId);
     } catch (error) {
         await connection.rollback();
-        throw error;
+        console.error("Error adding product:", error);
+        return null;
     } finally {
         connection.release();
     }
 }
 
-export async function deleteProduct(productId: string): Promise<void> {
+export async function updateProduct(id: string, updates: Partial<Product>): Promise<Product | null> {
     const connection = await pool.getConnection();
     try {
         await connection.beginTransaction();
 
-        // Delete product images first (due to foreign key constraint)
-        await connection.query('DELETE FROM product_images WHERE product_id = ?', [productId]);
+        // Update product table
+        const updateFields: string[] = [];
+        const updateValues: any[] = [];
+
+        if (updates.name !== undefined) {
+            updateFields.push('name = ?');
+            updateValues.push(updates.name);
+        }
+        if (updates.category !== undefined) {
+            updateFields.push('category = ?');
+            updateValues.push(updates.category);
+        }
+        if (updates.subcategory !== undefined) {
+            updateFields.push('subcategory = ?');
+            updateValues.push(updates.subcategory);
+        }
+        if (updates.description !== undefined) {
+            updateFields.push('description = ?');
+            updateValues.push(updates.description);
+        }
+        if (updates.price !== undefined) {
+            updateFields.push('price = ?');
+            updateValues.push(updates.price);
+        }
+        if (updates.stock_quantity !== undefined) {
+            updateFields.push('stock_quantity = ?');
+            updateValues.push(updates.stock_quantity);
+        }
+        if (updates.is_best_seller !== undefined) {
+            updateFields.push('is_best_seller = ?');
+            updateValues.push(updates.is_best_seller ? 1 : 0);
+        }
+        if (updates.primary_image_path !== undefined) {
+            updateFields.push('primary_image_path = ?');
+            updateValues.push(updates.primary_image_path);
+        }
+
+        if (updateFields.length > 0) {
+            updateFields.push('updated_at = NOW()');
+            await connection.query(`
+                UPDATE products 
+                SET ${updateFields.join(', ')}
+                WHERE id = ?
+            `, [...updateValues, id]);
+        }
+
+        // Update images if provided
+        if (updates.image_paths) {
+            // Delete existing images
+            await connection.query('DELETE FROM product_images WHERE product_id = ?', [id]);
+
+            // Insert new images
+            const imageValues = updates.image_paths.map((path) => [
+                uuidv4(), // Generate UUID for each image
+                id,
+                path,
+                path === updates.primary_image_path ? 1 : 0, // is_primary as tinyint
+                new Date(),
+                new Date()
+            ]);
+
+            await connection.query(`
+                INSERT INTO product_images (
+                    id,
+                    product_id,
+                    image_path,
+                    is_primary,
+                    created_at,
+                    updated_at
+                ) VALUES ?
+            `, [imageValues]);
+        }
+
+        await connection.commit();
+        return await getProductById(id);
+    } catch (error) {
+        await connection.rollback();
+        console.error("Error updating product:", error);
+        return null;
+    } finally {
+        connection.release();
+    }
+}
+
+export async function deleteProduct(id: string): Promise<boolean> {
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        // Delete related images first
+        await connection.query('DELETE FROM product_images WHERE product_id = ?', [id]);
 
         // Delete the product
-        await connection.query('DELETE FROM products WHERE id = ?', [productId]);
+        const [result] = await connection.query('DELETE FROM products WHERE id = ?', [id]) as any;
 
         await connection.commit();
+        return result.affectedRows > 0;
     } catch (error) {
         await connection.rollback();
-        throw error;
+        console.error("Error deleting product:", error);
+        return false;
     } finally {
         connection.release();
     }
-}
-
-export async function getTodaysSalesSummary(): Promise<TodaysSalesSummary> {
-    const [rows] = await executeQuery<any[]>(`
-        SELECT COUNT(*) as ordersToday, 
-               SUM(quantity_sold * price) as salesTodayAmount
-        FROM product_sales
-        WHERE DATE(sale_date) = CURDATE()
-    `);
-
-    const row = rows[0];
-    return {
-        ordersToday: row.ordersToday || 0,
-        salesTodayAmount: Number(row.salesTodayAmount) || 0
-    };
-}
-
-export async function getProductSalesSummary(
-    limit: number = 10,
-    startDate?: Date,
-    endDate?: Date
-): Promise<ProductSaleSummary[]> {
-    const dateFilter = startDate && endDate
-        ? 'WHERE sale_date BETWEEN ? AND ?'
-        : '';
-
-    const params: (Date | number)[] = startDate && endDate ? [startDate, endDate] : [];
-    if (limit) params.push(limit);
-
-    const rows = await executeQuery<any[]>(`
-        SELECT p.id as productId, p.name as productName,
-               SUM(ps.quantity_sold) as totalQuantitySold
-        FROM products p
-        LEFT JOIN product_sales ps ON p.id = ps.product_id
-        ${dateFilter}
-        GROUP BY p.id, p.name
-        ORDER BY totalQuantitySold DESC
-        LIMIT ?
-    `, params);
-
-    return rows.map(row => ({
-        productId: row.productId,
-        productName: row.productName,
-        totalQuantitySold: Number(row.totalQuantitySold) || 0
-    }));
-}
-
-export async function getTopSalesByQuantity(
-    limit: number = 10,
-    startDate?: Date,
-    endDate?: Date
-): Promise<TopSaleByQuantity[]> {
-    const dateFilter = startDate && endDate
-        ? 'WHERE sale_date BETWEEN ? AND ?'
-        : '';
-
-    const params: (Date | number)[] = startDate && endDate ? [startDate, endDate] : [];
-    if (limit) params.push(limit);
-
-    const rows = await executeQuery<any[]>(`
-        SELECT ps.id, p.name as productName, ps.quantity_sold as quantitySold,
-               ps.sale_date as saleDate
-        FROM product_sales ps
-        JOIN products p ON ps.product_id = p.id
-        ${dateFilter}
-        ORDER BY ps.quantity_sold DESC
-        LIMIT ?
-    `, params);
-
-    return rows.map(row => ({
-        id: row.id,
-        productName: row.productName,
-        quantitySold: Number(row.quantitySold),
-        saleDate: row.saleDate.toISOString()
-    }));
-}
-
-export async function getProductRevenueSummary(
-    limit: number = 10,
-    startDate?: Date,
-    endDate?: Date
-): Promise<ProductRevenueSummary[]> {
-    const dateFilter = startDate && endDate
-        ? 'WHERE sale_date BETWEEN ? AND ?'
-        : '';
-
-    const params: (Date | number)[] = startDate && endDate ? [startDate, endDate] : [];
-    if (limit) params.push(limit);
-
-    const rows = await executeQuery<any[]>(`
-        SELECT p.id as productId, p.name as productName,
-               SUM(ps.quantity_sold * p.price) as totalRevenue
-        FROM products p
-        LEFT JOIN product_sales ps ON p.id = ps.product_id
-        ${dateFilter}
-        GROUP BY p.id, p.name
-        ORDER BY totalRevenue DESC
-        LIMIT ?
-    `, params);
-
-    return rows.map(row => ({
-        productId: row.productId,
-        productName: row.productName,
-        totalRevenue: Number(row.totalRevenue) || 0
-    }));
 }
