@@ -4,7 +4,7 @@ import { cookies } from 'next/headers';
 
 export async function GET() {
   try {
-    const cookiesList = cookies();
+    const cookiesList = await cookies();
     const authToken = cookiesList.get('admin_token')?.value;
 
     if (!authToken) {

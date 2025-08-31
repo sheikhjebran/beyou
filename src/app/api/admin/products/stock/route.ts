@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 
 export async function GET() {
   try {
+    // Verify admin authentication
     const cookiesList = await cookies();
     const authToken = cookiesList.get('admin_token')?.value;
 
@@ -14,23 +15,18 @@ export async function GET() {
       });
     }
 
-    // Fetch recent sales with product details
+    // Fetch product stock data
     const [rows] = await mysql.query(
       `SELECT 
-        s.id,
-        p.name as productName,
-        s.quantity_sold as quantity,
-        s.total_amount as amount,
-        s.sale_date as date
-       FROM sales s
-       JOIN products p ON s.product_id = p.id
-       ORDER BY s.sale_date DESC
-       LIMIT 10`
+        name,
+        stock_quantity
+       FROM products
+       ORDER BY stock_quantity DESC`
     );
 
     return NextResponse.json(rows);
   } catch (error) {
-    console.error('Error fetching recent sales:', error);
+    console.error('Error fetching product stock data:', error);
     return new NextResponse(JSON.stringify({ error: 'Internal Server Error' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
