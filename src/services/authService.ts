@@ -9,6 +9,32 @@ interface LoginResponse {
   };
 }
 
+export async function signUpWithEmailPassword(email: string, password: string): Promise<LoginResponse> {
+  try {
+    const response = await fetch('/api/auth/signup', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to sign up');
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('An unexpected error occurred');
+  }
+}
+
 export async function signInWithEmailPassword(email: string, password: string): Promise<LoginResponse> {
   let response;
   try {

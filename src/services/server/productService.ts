@@ -3,6 +3,41 @@ import { Product } from '@/types/product';
 import { saveFile, deleteFile } from '@/lib/fileUpload';
 import { v4 as uuidv4 } from 'uuid';
 
+export async function getMostRecentProduct() {
+    try {
+        const [rows] = await executeQuery(
+            'SELECT * FROM products ORDER BY created_at DESC LIMIT 1'
+        ) as [any[], any];
+        
+        return rows[0] || null;
+    } catch (error) {
+        console.error('Error getting most recent product:', error);
+        throw error;
+    }
+}
+
+export async function getTodaysSalesSummary() {
+    try {
+        const [rows] = await executeQuery(`
+            SELECT 
+                COUNT(*) as total_sales,
+                SUM(total_amount) as total_revenue,
+                SUM(quantity_sold) as items_sold
+            FROM sales 
+            WHERE DATE(sale_date) = CURDATE()
+        `) as [any[], any];
+        
+        return {
+            totalSales: rows[0].total_sales || 0,
+            totalRevenue: rows[0].total_revenue || 0,
+            itemsSold: rows[0].items_sold || 0
+        };
+    } catch (error) {
+        console.error('Error getting today\'s sales summary:', error);
+        throw error;
+    }
+}
+
 // Constants
 const DEFAULT_PRIMARY_IMAGE_URL = '/images/placeholder.png';
 
