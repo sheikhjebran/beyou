@@ -122,17 +122,43 @@ async function runMigrations() {
         const migrationPath = join(migrationsDir, file);
         const migrationSQL = await fs.readFile(migrationPath, "utf8");
 
-        // Split by semicolon and execute each statement
-        const statements = migrationSQL
-          .split(";")
-          .map((stmt) => stmt.trim())
-          .filter((stmt) => {
-            if (!stmt || stmt.length === 0) return false;
-            if (stmt.startsWith("--")) return false; // Skip comments
-            if (stmt.toUpperCase().includes("CREATE DATABASE")) return false; // Skip database creation
-            if (stmt.toUpperCase().includes("USE ")) return false; // Skip USE statements
-            return true;
-          });
+        // Parse SQL statements properly
+        const statements = [];
+        const lines = migrationSQL.split("\n");
+        let currentStatement = "";
+
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+
+          // Skip empty lines and comments
+          if (!trimmedLine || trimmedLine.startsWith("--")) {
+            continue;
+          }
+
+          // Skip problematic database-level commands
+          if (
+            trimmedLine.toUpperCase().includes("CREATE DATABASE") ||
+            trimmedLine.toUpperCase().startsWith("USE ")
+          ) {
+            continue;
+          }
+
+          currentStatement += line + "\n";
+
+          // If line ends with semicolon, we have a complete statement
+          if (trimmedLine.endsWith(";")) {
+            const stmt = currentStatement.trim();
+            if (stmt && stmt.length > 1) {
+              statements.push(stmt);
+            }
+            currentStatement = "";
+          }
+        }
+
+        // Add any remaining statement
+        if (currentStatement.trim()) {
+          statements.push(currentStatement.trim());
+        }
 
         console.log(`📝 Executing ${statements.length} SQL statements...`);
 
@@ -172,16 +198,65 @@ async function runMigrations() {
 async function main() {
   await loadEnvironment();
 
-  // Check if reset flag is passed
+  // Check if reset flags are passed
   const shouldReset = process.argv.includes("--reset");
+  const shouldForceReset = process.argv.includes("--force-reset");
 
-  if (shouldReset) {
+  if (shouldForceReset) {
+    console.log(
+      "🔥 Force reset flag detected - will drop all tables and re-run all migrations"
+    );
+    await forceResetDatabase();
+  } else if (shouldReset) {
     console.log(
       "🔄 Reset flag detected - will clear migration history and re-run all migrations"
     );
     await resetMigrations();
   } else {
     await runMigrations();
+  }
+}
+
+async function forceResetDatabase() {
+  const connection = await mysql.createConnection({
+    host: process.env.MYSQL_HOST || "127.0.0.1",
+    user: process.env.MYSQL_USER || "root",
+    password: process.env.MYSQL_PASSWORD || "",
+    port: parseInt(process.env.MYSQL_PORT || "3306"),
+  });
+
+  try {
+    await connection.query(`USE ${process.env.MYSQL_DATABASE || "beyou_db"}`);
+
+    console.log("🗑️  Dropping all tables...");
+
+    // Get all tables
+    const [tables] = await connection.query("SHOW TABLES");
+
+    if (tables.length > 0) {
+      // Disable foreign key checks
+      await connection.query("SET FOREIGN_KEY_CHECKS = 0");
+
+      // Drop all tables
+      for (const tableRow of tables) {
+        const tableName = Object.values(tableRow)[0];
+        console.log(`  🗑️  Dropping table: ${tableName}`);
+        await connection.query(`DROP TABLE ${tableName}`);
+      }
+
+      // Re-enable foreign key checks
+      await connection.query("SET FOREIGN_KEY_CHECKS = 1");
+    }
+
+    console.log("✅ All tables dropped, now running migrations...");
+    await connection.end();
+
+    // Now run migrations normally
+    await runMigrations();
+  } catch (error) {
+    console.error("❌ Force reset failed:", error.message);
+    await connection.end();
+    throw error;
   }
 }
 
