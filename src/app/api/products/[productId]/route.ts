@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getProductById } from '@/services/server/productServerService';
 
-type Params = {
+interface RouteContext {
     params: {
-        productId: string
-    }
+        productId: string;
+    };
 }
 
 export async function GET(
     request: NextRequest,
-    context: Params
+    { params }: RouteContext
 ) {
     try {
-        const product = await getProductById(context.params.productId);
+        const product = await getProductById(params.productId);
 
         if (!product) {
             return NextResponse.json(
