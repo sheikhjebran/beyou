@@ -5,9 +5,13 @@ const nextConfig: NextConfig = {
   /* config options here */
   typescript: {
     ignoreBuildErrors: true,
+    tsconfigPath: "tsconfig.json"
   },
   eslint: {
     ignoreDuringBuilds: true,
+  },
+  experimental: {
+    typedRoutes: false
   },
   images: {
     domains: ['localhost'],
