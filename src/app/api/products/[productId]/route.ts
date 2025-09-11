@@ -1,15 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getProductById } from '@/services/server/productServerService';
 
-interface RouteContext {
-    params: {
-        productId: string;
-    };
-}
-
 export async function GET(
     request: NextRequest,
-    { params }: RouteContext
+    { params }: { params: { productId: string } }
 ) {
     try {
         const product = await getProductById(params.productId);
