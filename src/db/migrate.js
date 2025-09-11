@@ -1,13 +1,49 @@
 // Database migration runner - JavaScript version for server deployment
-import dotenv from "dotenv";
 import mysql from "mysql2/promise";
 import { promises as fs } from "fs";
 import { join } from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 
-// Load environment variables
-dotenv.config();
+// Load environment variables from .env files manually
+async function loadEnvFile(filePath) {
+  try {
+    const content = await fs.readFile(filePath, "utf8");
+    const lines = content.split("\n");
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith("#")) {
+        const [key, ...valueParts] = trimmed.split("=");
+        if (key && valueParts.length > 0) {
+          const value = valueParts.join("=").trim();
+          if (!process.env[key]) {
+            process.env[key] = value;
+          }
+        }
+      }
+    }
+  } catch (error) {
+    // File doesn't exist or can't be read, ignore
+    console.log(`Note: Could not load ${filePath}`);
+  }
+}
+
+// Load environment files in order of priority
+async function loadEnvironment() {
+  try {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const projectRoot = join(__dirname, "..", "..");
+
+    // Load .env files in priority order
+    await loadEnvFile(join(projectRoot, ".env"));
+    await loadEnvFile(join(projectRoot, ".env.production"));
+    await loadEnvFile(join(projectRoot, ".env.local"));
+  } catch (error) {
+    console.log("Note: Using system environment variables only");
+  }
+}
 
 async function runMigrations() {
   const connection = await mysql.createConnection({
@@ -123,8 +159,14 @@ async function runMigrations() {
   }
 }
 
+// Main execution
+async function main() {
+  await loadEnvironment();
+  await runMigrations();
+}
+
 // Run migrations
-runMigrations()
+main()
   .then(() => {
     console.log("✨ Migration process completed");
     process.exit(0);
