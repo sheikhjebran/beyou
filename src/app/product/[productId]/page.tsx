@@ -13,7 +13,7 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
 type ProductPageProps = {
-  params: { productId: string };
+  params: Promise<{ productId: string }>;
 };
 
 // Server-side function to generate metadata for SEO
@@ -22,7 +22,8 @@ export async function generateMetadata(
   parent: ResolvingMetadata
 ): Promise<Metadata> {
   try {
-    const productId = String(params?.productId);
+    const resolvedParams = await params;
+    const productId = String(resolvedParams?.productId);
     const product = await getProductById(productId);
 
     if (!product) {
@@ -34,13 +35,13 @@ export async function generateMetadata(
 
     return {
       title: `${product.name} - ${product.category}`,
-      description: `Shop for ${product.name}. ${product.description.substring(0, 150)}...`,
+      description: `Shop for ${product.name}. ${product.description?.substring(0, 150) || 'No description available'}...`,
       openGraph: {
         title: `${product.name} | BeYou`,
-        description: product.description.substring(0, 150),
+        description: product.description?.substring(0, 150) || 'No description available',
         images: [
           {
-            url: product.primaryImageUrl,
+            url: product.primary_image_path || '/images/placeholder.png',
             width: 600,
             height: 600,
             alt: product.name,
@@ -85,7 +86,8 @@ function ProductDetailsLoading() {
 // The main server component for the product detail page
 export default async function ProductDetailPage({ params }: ProductPageProps) {
   try {
-    const productId = String(params?.productId);
+    const resolvedParams = await params;
+    const productId = String(resolvedParams?.productId);
 
     if (!productId) {
       notFound();
@@ -97,24 +99,6 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
     if (!product) {
       notFound();
     }
-
-    return (
-      <>
-        <div className="container mx-auto px-4 py-8">
-          <Link href="/products" className="inline-flex items-center space-x-2 mb-4 text-sm text-gray-600 hover:text-gray-800">
-            <ArrowLeft className="w-4 h-4" />
-            <span>Back to Products</span>
-          </Link>
-          <Suspense fallback={<ProductDetailsLoading />}>
-            <ProductDetailsClient product={product} />
-          </Suspense>
-        </div>
-      </>
-    );
-  } catch (error) {
-    console.error('Error loading product:', error);
-    throw error; // Let Next.js error boundary handle it
-  }
 
     return (
       <div className="flex min-h-screen flex-col">
@@ -136,4 +120,8 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
       <Footer />
     </div>
   );
+  } catch (error) {
+    console.error('Error loading product:', error);
+    throw error; // Let Next.js error boundary handle it
+  }
 }
