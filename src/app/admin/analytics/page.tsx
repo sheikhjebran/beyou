@@ -8,12 +8,29 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ArrowLeft, BarChart2, Eye, ShoppingBag, PieChart, Loader2, AlertCircle, CalendarIcon } from 'lucide-react';
 import { ResponsiveContainer, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, Bar } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
-import { getProductSalesSummary, getTopSalesByQuantity, type ProductSaleSummary, type TopSaleByQuantity } from '@/services/productService';
+import { getProductSalesSummary, getTopSalesByQuantity } from '@/services/productService';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+
+// Define types locally to avoid import issues
+type ProductSaleSummary = {
+    productId: string;
+    productName: string;
+    totalQuantitySold: number;
+    totalRevenue: number;
+    averagePrice: number;
+};
+
+type TopSaleByQuantity = {
+    productId: string;
+    productName: string;
+    totalQuantitySold: number;
+    totalRevenue: number;
+    saleDate?: string;
+};
 
 const chartConfigPurchased = {
   totalQuantitySold: {
