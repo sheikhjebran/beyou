@@ -1,18 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getProductById } from '@/services/server/productServerService';
 
-type Props = {
-    params: {
-        productId: string;
-    };
-    searchParams: { [key: string]: string | string[] | undefined };
-};
-
 export async function GET(
     request: NextRequest,
-    props: Props
+    segmentData: any
 ) {
-    const { productId } = props.params;
+    const params = await segmentData.params;
+    const { productId } = params;
     try {
         const product = await getProductById(productId);
 
