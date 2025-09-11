@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getProductById } from '@/services/server/productServerService';
 
+type Params = {
+    params: {
+        productId: string
+    }
+}
+
 export async function GET(
     request: NextRequest,
-    { params }: { params: { productId: string } }
+    context: Params
 ) {
     try {
-        const product = await getProductById(params.productId);
+        const product = await getProductById(context.params.productId);
 
         if (!product) {
             return NextResponse.json(
