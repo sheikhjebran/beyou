@@ -14,10 +14,10 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const filePath = await saveFile(file, directory);
+        const result = await saveFile(directory, file);
         
         return NextResponse.json({
-            path: filePath,
+            path: result.path,
             size: file.size,
             type: file.type
         }, { status: 201 });

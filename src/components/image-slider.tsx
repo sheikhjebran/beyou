@@ -76,7 +76,6 @@ const ImageSlider: React.FC<ImageSliderProps> = ({
               priority={image.priority || index === 0}
               data-ai-hint={image.dataAiHint || 'banner image'}
               sizes="100vw" // Simplified for full-width hero elements
-              loadingText="Loading banner..."
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/30 to-transparent" />
             

@@ -10,8 +10,8 @@ export async function GET(request: NextRequest) {
             
             // Fetch products first to validate database connection
             console.log('Fetching products...');
-            const products = await getProducts();
-            console.log(`Successfully fetched ${products.length} products`);
+            const productsData = await getProducts();
+            console.log(`Successfully fetched ${productsData.products.length} products`);
 
             // Then fetch other data
             console.log('Fetching additional data...');
@@ -21,21 +21,22 @@ export async function GET(request: NextRequest) {
             ]);
             console.log('Successfully fetched additional data');
 
-            const totalProducts = products.length;
-            const zeroQuantityProducts = products.filter(p => p.quantity === 0);
+            const totalProducts = productsData.products.length;
+            const zeroQuantityProducts = productsData.products.filter((p: any) => p.stock_quantity === 0);
 
             const responseData = {
-                products,
+                products: productsData.products,
                 totalProducts,
                 zeroQuantityProducts,
                 recentProduct,
-                ordersToday: salesSummary.ordersToday,
-                salesTodayAmount: salesSummary.salesTodayAmount,
+                totalSales: salesSummary.totalSales,
+                totalRevenue: salesSummary.totalRevenue,
+                itemsSold: salesSummary.itemsSold,
             };
 
             console.log('Dashboard data fetch completed successfully');
             return NextResponse.json(responseData);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Detailed error in dashboard API:', {
                 error,
                 message: error instanceof Error ? error.message : 'Unknown error',
@@ -49,26 +50,4 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: errorMessage }, { status: 500 });
         }
     });
-    try {
-        const products = await getProducts();
-        const totalProducts = products.length;
-        const zeroQuantityProducts = products.filter(p => p.quantity === 0);
-        const recentProduct = await getMostRecentProduct();
-        const { ordersToday, salesTodayAmount } = await getTodaysSalesSummary();
-
-        return NextResponse.json({
-            products,
-            totalProducts,
-            zeroQuantityProducts,
-            recentProduct,
-            ordersToday,
-            salesTodayAmount,
-        });
-    } catch (error) {
-        console.error('Error in dashboard API:', error);
-        return NextResponse.json(
-            { error: error instanceof Error ? error.message : 'Failed to fetch dashboard data' },
-            { status: 500 }
-        );
-    }
 }

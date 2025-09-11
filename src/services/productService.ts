@@ -2,14 +2,50 @@
 
 import { Product } from '@/types/product';
 import type { AddProductData } from '@/types/productForm';
-import { 
-    UpdateProductData, 
-    TodaysSalesSummary, 
-    ProductSaleSummary, 
-    TopSaleByQuantity, 
-    ProductRevenueSummary
-} from './server/productService';
 import { uploadImage } from '@/lib/imageStorage';
+
+// Re-export Product type for client use
+export type { Product };
+
+// Define types for analytics and sales data
+export type ProductSaleSummary = {
+    productId: string;
+    productName: string;
+    totalQuantitySold: number;
+    totalRevenue: number;
+    averagePrice: number;
+};
+
+export type TopSaleByQuantity = {
+    productId: string;
+    productName: string;
+    totalQuantitySold: number;
+    totalRevenue: number;
+    saleDate?: string; // Optional sale date
+};
+
+export type TodaysSalesSummary = {
+    totalSales: number;
+    totalRevenue: number;
+    itemsSold: number;
+};
+
+export type ProductRevenueSummary = {
+    productId: string;
+    productName: string;
+    totalRevenue: number;
+    totalQuantitySold: number;
+};
+
+export type UpdateProductData = {
+    name?: string;
+    description?: string;
+    price?: number;
+    stock_quantity?: number;
+    category?: string;
+    sub_category?: string;
+    is_best_seller?: boolean;
+};
 
 export type PaginatedProducts = {
     products: Product[];

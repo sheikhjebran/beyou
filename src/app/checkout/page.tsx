@@ -104,7 +104,7 @@ export default function CheckoutPage() {
                           <TableCell className="pl-2 md:pl-4">
                             <div className="relative w-12 h-12 md:w-16 md:h-16">
                               <Image
-                                src={item.product.primaryImageUrl || 'https://placehold.co/64x64.png'}
+                                src={item.product.primary_image_path || 'https://placehold.co/64x64.png'}
                                 alt={item.product.name}
                                 fill // Use fill for responsive fixed size containers
                                 sizes="64px" // Provide an accurate size

@@ -1,4 +1,4 @@
-import pool from '@/lib/mysql';
+import pool from '@/lib/server/mysql';
 import { Product } from '@/types/product';
 
 const DEFAULT_PRIMARY_IMAGE_URL = 'https://placehold.co/400x300.png';
@@ -88,15 +88,15 @@ export async function getProducts(): Promise<Product[]> {
             id: row.id,
             name: row.name || 'Unnamed Product',
             category: row.category || 'Other',
-            subCategory: row.sub_category || 'Miscellaneous',
+            subcategory: row.sub_category || 'Miscellaneous',
             description: row.description || 'No description available.',
             price: Number(row.price) || 0,
-            primaryImageUrl: row.primary_image || DEFAULT_PRIMARY_IMAGE_URL,
-            imageUrls: row.image_paths ? row.image_paths.split(',') : [],
-            quantity: Number(row.quantity) || 0,
-            isBestSeller: Boolean(row.is_best_seller),
-            createdAt: row.created_at.toISOString(),
-            updatedAt: row.updated_at.toISOString()
+            primary_image_path: row.primary_image || DEFAULT_PRIMARY_IMAGE_URL,
+            image_paths: row.image_paths ? row.image_paths.split(',') : [],
+            stock_quantity: Number(row.quantity) || 0,
+            is_best_seller: Boolean(row.is_best_seller),
+            created_at: row.created_at.toISOString(),
+            updated_at: row.updated_at.toISOString()
         }));
     } catch (error) {
         console.warn("Warning during fetching products:", error);
@@ -124,15 +124,15 @@ export async function getBestSellingProducts(): Promise<Product[]> {
             id: row.id,
             name: row.name || 'Unnamed Product',
             category: row.category || 'Other',
-            subCategory: row.sub_category || 'Miscellaneous',
+            subcategory: row.sub_category || 'Miscellaneous',
             description: row.description || 'No description available.',
             price: Number(row.price) || 0,
-            primaryImageUrl: row.primary_image || DEFAULT_PRIMARY_IMAGE_URL,
-            imageUrls: row.image_paths ? row.image_paths.split(',') : [],
-            quantity: Number(row.quantity) || 0,
-            isBestSeller: true,
-            createdAt: row.created_at.toISOString(),
-            updatedAt: row.updated_at.toISOString()
+            primary_image_path: row.primary_image || DEFAULT_PRIMARY_IMAGE_URL,
+            image_paths: row.image_paths ? row.image_paths.split(',') : [],
+            stock_quantity: Number(row.quantity) || 0,
+            is_best_seller: true,
+            created_at: row.created_at.toISOString(),
+            updated_at: row.updated_at.toISOString()
         }));
     } catch (error) {
         console.warn("Warning during fetching best selling products:", error);
@@ -165,15 +165,15 @@ export async function getMostRecentProduct(): Promise<Product | null> {
             id: row.id,
             name: row.name || 'Unnamed Product',
             category: row.category || 'Other',
-            subCategory: row.sub_category || 'Miscellaneous',
+            subcategory: row.sub_category || 'Miscellaneous',
             description: row.description || 'No description available.',
             price: Number(row.price) || 0,
-            primaryImageUrl: row.primary_image || DEFAULT_PRIMARY_IMAGE_URL,
-            imageUrls: row.image_paths ? row.image_paths.split(',') : [],
-            quantity: Number(row.quantity) || 0,
-            isBestSeller: Boolean(row.is_best_seller),
-            createdAt: row.created_at.toISOString(),
-            updatedAt: row.updated_at.toISOString()
+            primary_image_path: row.primary_image || DEFAULT_PRIMARY_IMAGE_URL,
+            image_paths: row.image_paths ? row.image_paths.split(',') : [],
+            stock_quantity: Number(row.quantity) || 0,
+            is_best_seller: Boolean(row.is_best_seller),
+            created_at: row.created_at.toISOString(),
+            updated_at: row.updated_at.toISOString()
         };
     } catch (error) {
         console.warn("Warning during fetching the most recent product:", error);
@@ -205,15 +205,15 @@ export async function getProductById(productId: string): Promise<Product | null>
             id: row.id,
             name: row.name || 'Unnamed Product',
             category: row.category || 'Other',
-            subCategory: row.sub_category || 'Miscellaneous',
+            subcategory: row.sub_category || 'Miscellaneous',
             description: row.description || 'No description available.',
             price: Number(row.price) || 0,
-            primaryImageUrl: row.primary_image || DEFAULT_PRIMARY_IMAGE_URL,
-            imageUrls: row.image_paths ? row.image_paths.split(',') : [],
-            quantity: Number(row.quantity) || 0,
-            isBestSeller: Boolean(row.is_best_seller),
-            createdAt: row.created_at.toISOString(),
-            updatedAt: row.updated_at.toISOString()
+            primary_image_path: row.primary_image || DEFAULT_PRIMARY_IMAGE_URL,
+            image_paths: row.image_paths ? row.image_paths.split(',') : [],
+            stock_quantity: Number(row.quantity) || 0,
+            is_best_seller: Boolean(row.is_best_seller),
+            created_at: row.created_at.toISOString(),
+            updated_at: row.updated_at.toISOString()
         };
     } catch (error) {
         console.warn(`Warning during fetching product with ID ${productId}:`, error);

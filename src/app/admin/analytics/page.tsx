@@ -80,7 +80,7 @@ export default function AnalyticsPage() {
 
   const chartDataHighestQuantity = highestQuantityData.map((item, index) => ({
     name: `${item.productName.substring(0,12)}${item.productName.length > 12 ? '...' : ''} (Order ${index+1})`,
-    quantitySold: item.quantitySold,
+    quantitySold: item.totalQuantitySold,
     fullProductName: item.productName, // For tooltip
     saleDate: item.saleDate, // For tooltip
   }));
@@ -301,10 +301,9 @@ export default function AnalyticsPage() {
                                 <ChartTooltipContent
                                   className="text-xs"
                                   label={`${data.fullProductName}`}
-                                  items={[
-                                    { label: 'Qty in Order', value: data.quantitySold, color: 'hsl(var(--chart-2))' },
-                                    { label: 'Sale Date', value: data.saleDate, color: 'hsl(var(--muted-foreground))' },
-                                  ]}
+                                  indicator="dashed"
+                                  labelKey="name"
+                                  nameKey="quantitySold"
                                 />
                               );
                             }

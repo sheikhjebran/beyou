@@ -1,5 +1,5 @@
 // MySQL connection test script
-import pool from './mysql';
+import pool from './server/mysql';
 
 async function testConnection() {
   try {

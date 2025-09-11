@@ -1,4 +1,4 @@
-import pool from './mysql';
+import pool from './server/mysql';
 import fs from 'fs/promises';
 import path from 'path';
 import bcrypt from 'bcryptjs';

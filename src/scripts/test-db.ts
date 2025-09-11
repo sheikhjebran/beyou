@@ -8,7 +8,7 @@ async function testConnection() {
 
         // Test products table
         const [products] = await connection.query('SELECT COUNT(*) as count FROM products');
-        console.log('Products count:', products[0].count);
+        console.log('Products count:', (products as any[])[0].count);
 
         connection.release();
         console.log('Database connection test completed successfully');

@@ -4,6 +4,9 @@
 import { handleDatabaseResponse } from '@/lib/mysql';
 import type { Banner, AddBannerData } from '@/types/banner';
 
+// Re-export types for client use
+export type { AddBannerData };
+
 export async function getBanners(): Promise<Banner[]> {
     const response = await fetch('/api/banners');
     return handleDatabaseResponse<Banner[]>(response);

@@ -71,8 +71,8 @@ export async function PUT(request: NextRequest) {
             const photoFile = formData.get('photoFile') as File | null;
 
             await authService.updateUserProfile(userId, {
-                displayName,
-                photoFile: photoFile || undefined
+                display_name: displayName,
+                photo_file: photoFile || undefined
             });
         } else {
             const data = await request.json();

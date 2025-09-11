@@ -33,7 +33,7 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
     setSelectedQuantity(prev => {
       const newQuantity = prev + amount;
       if (newQuantity < 1) return 1;
-      const maxQty = product ? (product.stockQuantity > 0 ? Math.min(product.stockQuantity, 100) : 0) : 100;
+      const maxQty = product ? (product.stock_quantity > 0 ? Math.min(product.stock_quantity, 100) : 0) : 100;
       if (newQuantity > maxQty && maxQty > 0) return maxQty;
       if (newQuantity > 100) return 100;
       return newQuantity;
@@ -47,7 +47,7 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
       return;
     }
     const numValue = parseInt(value, 10);
-    const maxQty = product ? (product.stockQuantity > 0 ? Math.min(product.stockQuantity, 100) : 0) : 100;
+    const maxQty = product ? (product.stock_quantity > 0 ? Math.min(product.stock_quantity, 100) : 0) : 100;
 
     if (!isNaN(numValue) && numValue >= 1 && numValue <= maxQty) {
       setSelectedQuantity(numValue);
@@ -113,11 +113,11 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
       }
     };
 
-    const imageUrls = (product.imageUrls || []).filter(validateUrl);
-    const primaryUrl = product.primaryImageUrl;
+    const imageUrls = (product.image_paths || []).filter(validateUrl);
+    const primaryUrl = product.primary_image_path;
     
     if (primaryUrl && validateUrl(primaryUrl)) {
-      const otherImages = imageUrls.filter(url => url !== primaryUrl);
+      const otherImages = imageUrls.filter((url: string) => url !== primaryUrl);
       return [primaryUrl, ...otherImages];
     }
     
@@ -145,13 +145,13 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
             sizes="(max-width: 767px) 90vw, 45vw"
             imgClassName={cn(
               "object-cover",
-              product.stockQuantity === 0 && "blur-sm"
+              product.stock_quantity === 0 && "blur-sm"
             )}
             priority={true}
             key={currentDisplayImageSrc}
             data-ai-hint="product fashion beauty"
           />
-          {product.stockQuantity === 0 && (
+          {product.stock_quantity === 0 && (
             <>
               <div className="absolute inset-0 bg-black/30 z-10"></div>
               <Badge
@@ -187,7 +187,7 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
         </div>
         {displayImages.length > 1 && (
           <div className="mt-4 flex justify-center space-x-2 overflow-x-auto pb-2">
-            {displayImages.map((imgUrl, index) => (
+            {displayImages.map((imgUrl: string, index: number) => (
               <button
                 key={index}
                 onClick={() => setCurrentDisplayImageIndex(index)}
@@ -229,11 +229,11 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
               <Badge variant="outline" className="cursor-pointer hover:bg-accent">{product.category}</Badge>
             </Link>
           </div>
-          {product.subCategory && product.subCategory.length > 0 && (
+          {product.subcategory && product.subcategory.length > 0 && (
             <div>
               <h3 className="font-semibold text-foreground mb-1">Sub-Category:</h3>
-              <Link href={`/products?category=${encodeURIComponent(product.category)}&subCategory=${encodeURIComponent(product.subCategory)}`}>
-                <Badge variant="outline" className="cursor-pointer hover:bg-accent">{product.subCategory}</Badge>
+              <Link href={`/products?category=${encodeURIComponent(product.category)}&subCategory=${encodeURIComponent(product.subcategory)}`}>
+                <Badge variant="outline" className="cursor-pointer hover:bg-accent">{product.subcategory}</Badge>
               </Link>
             </div>
           )}
@@ -242,15 +242,15 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
         <div className="space-y-2">
           <Label htmlFor={`quantity-${product.id}`} className="text-base font-medium">Quantity</Label>
           <div className="flex items-center space-x-2">
-            <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={() => handleQuantityChange(-1)} disabled={selectedQuantity <= 1 || product.stockQuantity === 0} aria-label="Decrease quantity">
+            <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={() => handleQuantityChange(-1)} disabled={selectedQuantity <= 1 || product.stock_quantity === 0} aria-label="Decrease quantity">
               <Minus className="h-4 w-4" />
             </Button>
             <Input id={`quantity-${product.id}`} type="number" value={selectedQuantity} onChange={handleInputChange} min="1"
-              max={product.stockQuantity > 0 ? Math.min(product.stockQuantity, 100) : 0}
+              max={product.stock_quantity > 0 ? Math.min(product.stock_quantity, 100) : 0}
               className="h-9 w-20 text-center text-base" aria-label="Product quantity"
-              disabled={product.stockQuantity === 0} />
+              disabled={product.stock_quantity === 0} />
             <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={() => handleQuantityChange(1)}
-              disabled={selectedQuantity >= (product.stockQuantity > 0 ? Math.min(product.stockQuantity, 100) : 0) || product.stockQuantity === 0}
+              disabled={selectedQuantity >= (product.stock_quantity > 0 ? Math.min(product.stock_quantity, 100) : 0) || product.stock_quantity === 0}
               aria-label="Increase quantity">
               <Plus className="h-4 w-4" />
             </Button>
@@ -258,10 +258,10 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
         </div>
         <div className="space-y-2">
           <Label htmlFor={`note-${product.id}`} className="text-base font-medium">Note (Optional)</Label>
-          <Textarea id={`note-${product.id}`} placeholder="Add a special request or note for this item..." value={note} onChange={(e) => setNote(e.target.value)} className="min-h-[80px] resize-none text-sm" disabled={product.quantity === 0} />
+          <Textarea id={`note-${product.id}`} placeholder="Add a special request or note for this item..." value={note} onChange={(e) => setNote(e.target.value)} className="min-h-[80px] resize-none text-sm" disabled={product.stock_quantity === 0} />
         </div>
         <div className="space-y-3">
-          <Button className="w-full text-base py-3" aria-label={`Add ${product.name} to cart`} onClick={handleAddToCart} disabled={product.stockQuantity === 0 || selectedQuantity > product.stockQuantity}>
+          <Button className="w-full text-base py-3" aria-label={`Add ${product.name} to cart`} onClick={handleAddToCart} disabled={product.stock_quantity === 0 || selectedQuantity > product.stock_quantity}>
             <ShoppingBag className="mr-2 h-5 w-5" /> Add to Cart
           </Button>
           <Button

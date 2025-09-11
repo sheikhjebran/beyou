@@ -3,19 +3,20 @@ import { getProducts, getMostRecentProduct, getTodaysSalesSummary } from '@/serv
 
 export async function GET() {
     try {
-        const products = await getProducts();
-        const totalProducts = products.length;
-        const zeroQuantityProducts = products.filter(p => p.quantity === 0);
+        const productsData = await getProducts();
+        const totalProducts = productsData.products.length;
+        const zeroQuantityProducts = productsData.products.filter((p: any) => p.stock_quantity === 0);
         const recentProduct = await getMostRecentProduct();
-        const { ordersToday, salesTodayAmount } = await getTodaysSalesSummary();
+        const salesSummary = await getTodaysSalesSummary();
 
         return NextResponse.json({
-            products,
+            products: productsData.products,
             totalProducts,
             zeroQuantityProducts,
             recentProduct,
-            ordersToday,
-            salesTodayAmount,
+            totalSales: salesSummary.totalSales,
+            totalRevenue: salesSummary.totalRevenue,
+            itemsSold: salesSummary.itemsSold,
             error: null
         });
     } catch (error) {

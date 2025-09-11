@@ -23,15 +23,15 @@ export async function getProductById(productId: string): Promise<Product | null>
             id: row.id,
             name: row.name || 'Unnamed Product',
             category: row.category || 'Other',
-            subCategory: row.sub_category || 'Miscellaneous',
+            subcategory: row.sub_category || 'Miscellaneous',
             description: row.description || 'No description available.',
             price: Number(row.price) || 0,
-            primaryImageUrl: row.primary_image ? getImageUrl(row.primary_image) : '/images/placeholder.png',
-            imageUrls: row.image_paths ? row.image_paths.split(',').filter(Boolean).map(getImageUrl) : [],
-            stockQuantity: Number(row.stock_quantity) || 0,
-            isBestSeller: Boolean(row.is_best_seller),
-            createdAt: row.created_at ? row.created_at.toISOString() : null,
-            updatedAt: row.updated_at ? row.updated_at.toISOString() : null
+            primary_image_path: row.primary_image ? getImageUrl(row.primary_image) : '/images/placeholder.png',
+            image_paths: row.image_paths ? row.image_paths.split(',').filter(Boolean).map(getImageUrl) : [],
+            stock_quantity: Number(row.stock_quantity) || 0,
+            is_best_seller: Boolean(row.is_best_seller),
+            created_at: row.created_at ? row.created_at.toISOString() : null,
+            updated_at: row.updated_at ? row.updated_at.toISOString() : null
         };
     } catch (error) {
         console.error('Error fetching product by ID:', error);

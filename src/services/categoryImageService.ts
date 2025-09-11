@@ -5,6 +5,9 @@ import { handleDatabaseResponse } from '@/lib/mysql';
 import { normalizeCategoryNameForId } from '@/lib/utils';
 import type { CategoryImageData } from '@/types/categoryImage';
 
+// Re-export types for client use
+export type { CategoryImageData };
+
 export async function getCategoryImage(categoryName: string): Promise<CategoryImageData | null> {
   if (!categoryName) return null;
   const docId = normalizeCategoryNameForId(categoryName);

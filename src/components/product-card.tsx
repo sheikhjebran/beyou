@@ -25,11 +25,11 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, priority, className }: ProductCardProps) {
-  const { addItem } = useCart();
+  const { addToCart } = useCart();
   const { toast } = useToast();
 
   const handleAddToCart = () => {
-    if (product.stockQuantity === 0) {
+    if (product.stock_quantity === 0) {
       toast({
         title: "Out of Stock",
         description: "This item is currently out of stock.",
@@ -38,7 +38,7 @@ export function ProductCard({ product, priority, className }: ProductCardProps) 
       return;
     }
 
-    addItem(product);
+    addToCart(product, 1);
     toast({
       title: "Added to Cart",
       description: `${product.name} has been added to your cart.`,
@@ -57,11 +57,11 @@ export function ProductCard({ product, priority, className }: ProductCardProps) 
               sizes="(max-width: 639px) 45vw, (max-width: 1023px) 30vw, 22vw"
               className={cn(
                 "rounded-md object-cover transition-transform duration-300 group-hover:scale-105",
-                product.stockQuantity === 0 && "blur-sm"
+                product.stock_quantity === 0 && "blur-sm"
               )}
               data-ai-hint="product list item"
             />
-            {product.stockQuantity === 0 && (
+            {product.stock_quantity === 0 && (
               <>
                 <div className="absolute inset-0 bg-black/30 z-10"></div>
                 <Badge
@@ -96,11 +96,11 @@ export function ProductCard({ product, priority, className }: ProductCardProps) 
       <CardFooter className="p-3 sm:p-4 pt-0">
         <Button 
           className="w-full" 
-          variant={product.stockQuantity === 0 ? "outline" : "default"}
+          variant={product.stock_quantity === 0 ? "outline" : "default"}
           onClick={handleAddToCart}
-          disabled={product.stockQuantity === 0}
+          disabled={product.stock_quantity === 0}
         >
-          {product.stockQuantity === 0 ? 'Out of Stock' : 'Add to Cart'}
+          {product.stock_quantity === 0 ? 'Out of Stock' : 'Add to Cart'}
         </Button>
       </CardFooter>
     </Card>

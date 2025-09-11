@@ -75,8 +75,8 @@ export const CartProvider = React.memo(function CartProvider({ children }: CartP
       const newTotalQuantity = currentQuantity + quantity;
 
       // Check if we have enough stock
-      if (newTotalQuantity > product.stockQuantity) {
-        console.warn(`Not enough stock for ${product.name}. Available: ${product.stockQuantity}, Requested: ${newTotalQuantity}`);
+      if (newTotalQuantity > product.stock_quantity) {
+        console.warn(`Not enough stock for ${product.name}. Available: ${product.stock_quantity}, Requested: ${newTotalQuantity}`);
         return prevItems;
       }
 
@@ -98,7 +98,7 @@ export const CartProvider = React.memo(function CartProvider({ children }: CartP
            // Ensure new quantity is within stock limits and not negative
            const validQuantity = Math.min(
              Math.max(0, newQuantity),
-             item.product.stockQuantity
+             item.product.stock_quantity
            );
            return { ...item, quantity: validQuantity };
          }

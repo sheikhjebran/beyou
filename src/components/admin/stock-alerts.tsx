@@ -63,7 +63,7 @@ export function StockAlerts() {
             <TableCell>{product.stock_quantity}</TableCell>
             <TableCell>
               <Badge 
-                variant={product.stock_quantity === 0 ? "destructive" : "warning"}
+                variant={product.stock_quantity === 0 ? "destructive" : "secondary"}
               >
                 {product.stock_quantity === 0 ? "Out of Stock" : "Low Stock"}
               </Badge>
