@@ -126,10 +126,19 @@ async function runMigrations() {
         const statements = migrationSQL
           .split(";")
           .map((stmt) => stmt.trim())
-          .filter((stmt) => stmt.length > 0 && !stmt.startsWith("--"));
+          .filter((stmt) => {
+            if (!stmt || stmt.length === 0) return false;
+            if (stmt.startsWith("--")) return false; // Skip comments
+            if (stmt.toUpperCase().includes("CREATE DATABASE")) return false; // Skip database creation
+            if (stmt.toUpperCase().includes("USE ")) return false; // Skip USE statements
+            return true;
+          });
+
+        console.log(`📝 Executing ${statements.length} SQL statements...`);
 
         for (const statement of statements) {
           if (statement.trim()) {
+            console.log(`   → ${statement.substring(0, 50)}...`);
             await connection.query(statement);
           }
         }
@@ -162,7 +171,44 @@ async function runMigrations() {
 // Main execution
 async function main() {
   await loadEnvironment();
-  await runMigrations();
+
+  // Check if reset flag is passed
+  const shouldReset = process.argv.includes("--reset");
+
+  if (shouldReset) {
+    console.log(
+      "🔄 Reset flag detected - will clear migration history and re-run all migrations"
+    );
+    await resetMigrations();
+  } else {
+    await runMigrations();
+  }
+}
+
+async function resetMigrations() {
+  const connection = await mysql.createConnection({
+    host: process.env.MYSQL_HOST || "127.0.0.1",
+    user: process.env.MYSQL_USER || "root",
+    password: process.env.MYSQL_PASSWORD || "",
+    port: parseInt(process.env.MYSQL_PORT || "3306"),
+  });
+
+  try {
+    await connection.query(`USE ${process.env.MYSQL_DATABASE || "beyou_db"}`);
+
+    console.log("🗑️  Clearing migration history...");
+    await connection.query("DELETE FROM migrations");
+
+    console.log("✅ Migration history cleared, now running migrations...");
+    await connection.end();
+
+    // Now run migrations normally
+    await runMigrations();
+  } catch (error) {
+    console.error("❌ Reset failed:", error.message);
+    await connection.end();
+    throw error;
+  }
 }
 
 // Run migrations
