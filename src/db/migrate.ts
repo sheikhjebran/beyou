@@ -1,4 +1,5 @@
 // Database migration runner
+import 'dotenv/config';
 import mysql from 'mysql2/promise';
 import { promises as fs } from 'fs';
 import { join } from 'path';
@@ -13,9 +14,10 @@ type MigrationRecord = {
 
 async function runMigrations() {
     const connection = await mysql.createConnection({
-        host: '127.0.0.1',
-        user: 'jebran',
-        password: 'Arhaan@123'
+        host: process.env.MYSQL_HOST || '127.0.0.1',
+        user: process.env.MYSQL_USER || 'root',
+        password: process.env.MYSQL_PASSWORD || '',
+        port: parseInt(process.env.MYSQL_PORT || '3306')
     });
 
     try {
