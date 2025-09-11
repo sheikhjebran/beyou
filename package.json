@@ -11,7 +11,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "migrate": "ts-node src/db/migrate.ts"
+    "migrate": "ts-node src/db/migrate.ts",
+    "migrate:server": "node src/db/migrate.js"
   },
   "dependencies": {
     "@genkit-ai/googleai": "^1.0.4",
