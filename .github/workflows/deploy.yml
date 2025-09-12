@@ -2,22 +2,25 @@ name: Deploy to VPS
 
 on:
   push:
-    branches: [ feature/new_latest_migration_mysql ]
+    branches: [feature/new_latest_migration_mysql]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-    - name: SSH commands: git pull, build, restart
-      uses: appleboy/ssh-action@v0.1.7
-      with:
-        host: 66.116.198.204
-        username: deploy
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        script: |
-          cd /var/www/beyoushop
-          git reset --hard
-          git pull origin main
-          npm ci
-          npm run build
-          pm2 restart ecosystem.config.js || pm2 start ecosystem.config.js
+      - name: SSH commands - git pull, migrate, build, restart
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: 66.116.198.204
+          username: deploy
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /var/www/beyou
+            git config --global --add safe.directory /var/www/beyou
+            git remote set-url origin https://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@github.com/sheikhjebran/beyou.git
+            git reset --hard
+            git pull origin feature/new_latest_migration_mysql
+            npm ci
+            npm run migrate:server
+            npm run build
+            pm2 restart beyou || pm2 start beyou
