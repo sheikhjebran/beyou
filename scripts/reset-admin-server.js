@@ -33,7 +33,7 @@ async function loadEnvironment() {
   try {
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = dirname(__filename);
-    const projectRoot = __dirname;
+    const projectRoot = join(__dirname, "..");
 
     await loadEnvFile(join(projectRoot, ".env"));
     await loadEnvFile(join(projectRoot, ".env.production"));
