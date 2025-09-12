@@ -12,8 +12,8 @@ jobs:
         uses: appleboy/ssh-action@v0.1.7
         with:
           host: 66.116.198.204
-          username: deploy
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          username: root
+          password: ${{ secrets.SSH_PASSWORD }}
           script: |
             cd /var/www/beyou
             git config --global --add safe.directory /var/www/beyou
