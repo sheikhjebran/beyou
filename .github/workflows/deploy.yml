@@ -20,6 +20,7 @@ jobs:
             git remote set-url origin https://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@github.com/sheikhjebran/beyou.git
             git reset --hard
             git pull origin feature/new_latest_migration_mysql
+            mv .env.local .env.local.backup
             npm ci
             npm run migrate:server
             npm run build
