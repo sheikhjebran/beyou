@@ -6,7 +6,7 @@ import { fileURLToPath } from "url";
 import { dirname } from "path";
 
 // Load environment variables from .env files manually
-async function loadEnvFile(filePath) {
+async function loadEnvFile(filePath, override = false) {
   try {
     const content = await fs.readFile(filePath, "utf8");
     const lines = content.split("\n");
@@ -17,7 +17,7 @@ async function loadEnvFile(filePath) {
         const [key, ...valueParts] = trimmed.split("=");
         if (key && valueParts.length > 0) {
           const value = valueParts.join("=").trim();
-          if (!process.env[key]) {
+          if (!process.env[key] || override) {
             process.env[key] = value;
           }
         }
@@ -37,7 +37,7 @@ async function loadEnvironment() {
 
     await loadEnvFile(join(projectRoot, ".env"));
     await loadEnvFile(join(projectRoot, ".env.production"));
-    await loadEnvFile(join(projectRoot, ".env.local"));
+    await loadEnvFile(join(projectRoot, ".env.local"), true); // Override with local settings
   } catch (error) {
     console.log("Note: Using system environment variables only");
   }
