@@ -17,11 +17,15 @@ export async function GET(request: Request) {
 
     try {
       console.log('Token found, verifying...');
-      const decoded = verify(token.value, JWT_SECRET);
+      const decoded = verify(token.value, JWT_SECRET) as any;
       console.log('Token verified successfully:', decoded);
       return NextResponse.json({ 
         valid: true, 
-        user: decoded 
+        user: {
+          id: decoded.userId,
+          email: decoded.email,
+          role: decoded.role
+        }
       });
     } catch (error) {
       console.error('Token verification failed:', error);
