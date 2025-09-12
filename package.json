@@ -12,7 +12,11 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "migrate": "ts-node src/db/migrate.ts",
-    "migrate:server": "node src/db/migrate.js"
+    "migrate:server": "node src/db/migrate.js",
+    "admin:create": "tsx scripts/create-admin.ts",
+    "admin:reset": "tsx scripts/reset-admin.ts",
+    "admin:check": "tsx scripts/check-admin.ts",
+    "admin:reset-server": "node scripts/reset-admin-server.js"
   },
   "dependencies": {
     "@genkit-ai/googleai": "^1.0.4",
