@@ -16,7 +16,8 @@
     "admin:create": "tsx scripts/create-admin.ts",
     "admin:reset": "tsx scripts/reset-admin.ts",
     "admin:check": "tsx scripts/check-admin.ts",
-    "admin:reset-server": "node scripts/reset-admin-server.js"
+    "admin:reset-server": "node scripts/reset-admin-server.js",
+    "test:login": "node scripts/test-login.js"
   },
   "dependencies": {
     "@genkit-ai/googleai": "^1.0.4",
