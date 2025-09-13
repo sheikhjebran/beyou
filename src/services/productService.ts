@@ -203,12 +203,28 @@ export async function updateProduct(productId: string, productData: UpdateProduc
 }
 
 export async function deleteProduct(productId: string): Promise<void> {
+    console.log('Client deleteProduct called for ID:', productId);
     const response = await fetch(`/api/products?id=${productId}`, {
         method: 'DELETE',
     });
+    
+    console.log('Delete response status:', response.status);
+    
     if (!response.ok) {
-        throw new Error('Failed to delete product');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('Delete failed with error:', errorData);
+        throw new Error(errorData.error || 'Failed to delete product');
     }
+    
+    const result = await response.json();
+    console.log('Delete response data:', result);
+    
+    if (!result.success) {
+        console.error('Delete operation failed:', result);
+        throw new Error(result.error || 'Delete operation failed');
+    }
+    
+    console.log('Product deleted successfully on client side');
 }
 
 export async function getTodaysSalesSummary(): Promise<TodaysSalesSummary> {
