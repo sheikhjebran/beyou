@@ -34,19 +34,29 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import useSWR from 'swr';
+import { Pagination, PaginationInfo } from '@/components/ui/pagination';
 
-const fetcher = async (url: string) => {
+interface PaginatedProductsResponse {
+  products: Product[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+const fetcher = async (url: string): Promise<PaginatedProductsResponse> => {
   try {
     const res = await fetch(url);
     if (!res.ok) {
       throw new Error('Failed to fetch products');
     }
     const data = await res.json();
-    if (!data || !data.products) {
-      return [];  // Return empty array if no products
+    if (!data) {
+      return { products: [], total: 0, page: 1, pageSize: 10, totalPages: 0 };
     }
-    return data.products;
+    return data;
   } catch (error) {
     // Convert any error to a string message
     throw new Error(error instanceof Error ? error.message : 'Failed to load products');
@@ -55,13 +65,25 @@ const fetcher = async (url: string) => {
 
 export default function InventoryPage() {
   const [page, setPage] = useState(1);
-  const pageSize = 10;
-  const { data: products = [], error, isLoading, mutate } = useSWR<Product[]>(`/api/products?page=${page}&pageSize=${pageSize}`, fetcher);
+  const [pageSize, setPageSize] = useState(10);
+  const { data, error, isLoading, mutate } = useSWR<PaginatedProductsResponse>(`/api/products?page=${page}&pageSize=${pageSize}`, fetcher);
+  
+  // Extract data from response
+  const products = data?.products || [];
+  const total = data?.total || 0;
+  const totalPages = data?.totalPages || 0;
+  
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
   const [togglingProductId, setTogglingProductId] = useState<string | null>(null);
   const { toast } = useToast();
   const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+
+  // Reset to page 1 when pageSize changes
+  const handlePageSizeChange = (newPageSize: string) => {
+    setPageSize(parseInt(newPageSize));
+    setPage(1);
+  };
 
   const openDeleteDialog = (product: Product) => {
     setProductToDelete(product);
@@ -73,13 +95,18 @@ export default function InventoryPage() {
     setTogglingProductId(product.id);
     
     // Optimistically update the UI first
-    const previousProducts = products;
-    await mutate(
-      products.map((p: Product) =>
-        p.id === product.id ? { ...p, is_best_seller: newStatus } : p
-      ),
-      false
-    );
+    const previousData = data;
+    if (data) {
+      await mutate(
+        {
+          ...data,
+          products: data.products.map((p: Product) =>
+            p.id === product.id ? { ...p, is_best_seller: newStatus } : p
+          )
+        },
+        false
+      );
+    }
 
     try {
       await updateProductBestSellerStatus(product.id, newStatus);
@@ -89,7 +116,9 @@ export default function InventoryPage() {
       });
     } catch (err) {
       // Revert to previous state on error
-      await mutate(previousProducts, false);
+      if (previousData) {
+        await mutate(previousData, false);
+      }
       toast({
         variant: "destructive",
         title: "Update Failed",
@@ -112,10 +141,17 @@ export default function InventoryPage() {
     try {
       await deleteProductService(productToDelete.id);
       // Optimistically update UI
-      await mutate(
-        products.filter((p: Product) => p.id !== productToDelete.id),
-        false
-      );
+      if (data) {
+        await mutate(
+          {
+            ...data,
+            products: data.products.filter((p: Product) => p.id !== productToDelete.id),
+            total: data.total - 1,
+            totalPages: Math.ceil((data.total - 1) / pageSize)
+          },
+          false
+        );
+      }
       toast({
         title: "Product Deleted",
         description: `Product "${productToDelete.name}" has been successfully deleted.`,
@@ -137,8 +173,15 @@ export default function InventoryPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl md:text-3xl font-bold">Inventory Management</h1>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold">Inventory Management</h1>
+          {!isLoading && !error && (
+            <p className="text-muted-foreground mt-1">
+              Managing {total} product{total !== 1 ? 's' : ''} across {totalPages} page{totalPages !== 1 ? 's' : ''}
+            </p>
+          )}
+        </div>
          <Link href="/admin/inventory/add" className="block">
              <Button>
                  <PlusCircle className="mr-2 h-4 w-4" /> Add Product
@@ -148,8 +191,29 @@ export default function InventoryPage() {
 
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Product List</CardTitle>
-          <CardDescription>View, add, edit, or delete your products. Use the toggle to mark items as best sellers.</CardDescription>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <CardTitle>Product List</CardTitle>
+              <CardDescription>View, add, edit, or delete your products. Use the toggle to mark items as best sellers.</CardDescription>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Label htmlFor="pageSize" className="text-sm font-medium">
+                Show:
+              </Label>
+              <Select value={pageSize.toString()} onValueChange={handlePageSizeChange}>
+                <SelectTrigger className="w-20" id="pageSize">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="5">5</SelectItem>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-sm text-muted-foreground">per page</span>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
            {error ? (
@@ -274,6 +338,24 @@ export default function InventoryPage() {
               )}
             </TableBody>
           </Table>
+          )}
+          
+          {/* Pagination Controls */}
+          {!error && !isLoading && totalPages > 1 && (
+            <div className="mt-6 space-y-4">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <PaginationInfo
+                  currentPage={page}
+                  pageSize={pageSize}
+                  totalItems={total}
+                />
+                <Pagination
+                  currentPage={page}
+                  totalPages={totalPages}
+                  onPageChange={setPage}
+                />
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>
