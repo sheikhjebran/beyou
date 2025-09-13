@@ -130,19 +130,32 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
     try {
+        console.log('DELETE /api/products called');
         const { searchParams } = new URL(request.url);
         const productId = searchParams.get('id');
 
+        console.log('Delete request for product ID:', productId);
+
         if (!productId) {
+            console.log('No product ID provided');
             return NextResponse.json({ error: 'Product ID is required' }, { status: 400 });
         }
 
-        await productService.deleteProduct(productId);
-        return NextResponse.json({ success: true });
+        console.log('Calling server deleteProduct function...');
+        const result = await productService.deleteProduct(productId);
+        console.log('Delete result:', result);
+        
+        if (!result) {
+            console.log('Delete failed - no rows affected');
+            return NextResponse.json({ error: 'Product not found or could not be deleted' }, { status: 404 });
+        }
+        
+        console.log('Product deleted successfully');
+        return NextResponse.json({ success: true, message: 'Product deleted successfully' });
     } catch (error) {
         console.error('Error in DELETE /api/products:', error);
         return NextResponse.json(
-            { error: 'Internal server error' },
+            { error: error instanceof Error ? error.message : 'Internal server error' },
             { status: 500 }
         );
     }

@@ -466,23 +466,47 @@ export async function updateProduct(id: string, updates: Partial<Product>): Prom
 }
 
 export async function deleteProduct(id: string): Promise<boolean> {
+    console.log('Server deleteProduct called with ID:', id);
     const connection = await pool.getConnection();
     try {
         await connection.beginTransaction();
+        console.log('Transaction started for product deletion');
+
+        // First, check if product exists
+        const [checkResult] = await connection.query('SELECT id, name FROM products WHERE id = ?', [id]) as any;
+        console.log('Product lookup result:', checkResult);
+        
+        if (checkResult.length === 0) {
+            console.log('Product not found with ID:', id);
+            await connection.rollback();
+            return false;
+        }
+
+        console.log('Found product to delete:', checkResult[0].name);
 
         // Delete related images first
-        await connection.query('DELETE FROM product_images WHERE product_id = ?', [id]);
+        console.log('Deleting product images...');
+        const [imageDeleteResult] = await connection.query('DELETE FROM product_images WHERE product_id = ?', [id]) as any;
+        console.log('Deleted', imageDeleteResult.affectedRows, 'product images');
 
         // Delete the product
+        console.log('Deleting product from products table...');
         const [result] = await connection.query('DELETE FROM products WHERE id = ?', [id]) as any;
+        console.log('Product delete result:', result);
+        console.log('Affected rows:', result.affectedRows);
 
         await connection.commit();
-        return result.affectedRows > 0;
+        console.log('Transaction committed successfully');
+        
+        const success = result.affectedRows > 0;
+        console.log('Delete operation success:', success);
+        return success;
     } catch (error) {
         await connection.rollback();
         console.error("Error deleting product:", error);
         return false;
     } finally {
         connection.release();
+        console.log('Database connection released');
     }
 }
