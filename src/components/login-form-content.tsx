@@ -95,7 +95,7 @@ export function LoginFormContent() {
                   <FormControl>
                     <Input 
                       type="email" 
-                      placeholder="admin@beyou.com" 
+                      placeholder="Enter email address" 
                       {...field} 
                       suppressHydrationWarning
                     />
