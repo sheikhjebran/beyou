@@ -19,7 +19,8 @@ export async function GET() {
     const [rows] = await mysql.query(
       `SELECT 
         name,
-        stock_quantity
+        stock_quantity,
+        category
        FROM products
        ORDER BY stock_quantity DESC`
     );
