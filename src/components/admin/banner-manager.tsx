@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Button } from "@/components/ui/button";
+import { getAdminBanners, deleteAdminBanner } from '@/services/bannerService';
 import {
   Table,
   TableBody,
@@ -13,12 +14,7 @@ import {
 import { Edit2, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 
-interface Banner {
-  id: string;
-  title: string;
-  subtitle: string | null;
-  image_path: string;
-}
+import type { Banner } from '@/types/banner';
 
 export function BannerManager() {
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -28,14 +24,11 @@ export function BannerManager() {
   useEffect(() => {
     async function fetchBanners() {
       try {
-        const response = await fetch('/api/admin/banners', {
-          credentials: 'include'
-        });
-        if (!response.ok) throw new Error('Failed to fetch banners');
-        const data = await response.json();
+        const data = await getAdminBanners();
         setBanners(data);
       } catch (err: any) {
         setError(err.message);
+        console.error('Error fetching banners:', err);
       } finally {
         setLoading(false);
       }
@@ -85,8 +78,8 @@ export function BannerManager() {
             <TableRow key={banner.id}>
               <TableCell>
                 <Image
-                  src={banner.image_path}
-                  alt={banner.title}
+                  src={banner.imageUrl}
+                  alt={banner.title || 'Banner image'}
                   width={100}
                   height={50}
                   className="rounded-md"

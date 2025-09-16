@@ -1,11 +1,8 @@
 import { NextResponse } from 'next/server';
 import { type NextRequest } from 'next/server';
-import { headers } from 'next/headers';
-
-import { verifyUser } from '@/services/server/authService';
-
 import { verifyAdminAuth } from '@/lib/server/admin-auth';
 
+// For API routes
 export async function withAdminAuth(request: NextRequest, handler: (request: NextRequest) => Promise<NextResponse>) {
   try {
     // Get the token from cookie

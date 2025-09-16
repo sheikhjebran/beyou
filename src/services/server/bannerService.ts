@@ -13,24 +13,41 @@ export interface AddBannerData {
 }
 
 export async function getBanners(): Promise<Banner[]> {
-    const banners = await executeQuery<any[]>(
-        'SELECT * FROM banners ORDER BY created_at DESC'
-    );
-    
-    return banners.map(banner => {
-        // Ensure the path starts with a forward slash and doesn't have /admin/
-        const imagePath = banner.image_path.startsWith('/') ? banner.image_path : `/${banner.image_path}`;
-        const cleanPath = imagePath.replace(/^\/admin\//, '/');
+    try {
+        console.log('Fetching banners from database...');
+        const banners = await executeQuery<any[]>(
+            'SELECT * FROM banners ORDER BY created_at DESC'
+        );
         
-        return {
-            id: banner.id,
-            imageUrl: cleanPath,
-            title: banner.title || '',
-            subtitle: banner.subtitle || '',
-            createdAt: banner.created_at.toISOString(),
-            filePath: cleanPath
-        };
-    });
+        console.log(`Found ${banners.length} banners`);
+        
+        return banners.map(banner => {
+            // Ensure the path starts with a forward slash and doesn't have /admin/
+            const imagePath = banner.image_path?.startsWith('/') 
+                ? banner.image_path 
+                : `/${banner.image_path || ''}`;
+            
+            const cleanPath = imagePath.replace(/^\/admin\//, '/');
+            
+            console.log('Processing banner:', {
+                id: banner.id,
+                originalPath: banner.image_path,
+                cleanPath: cleanPath
+            });
+            
+            return {
+                id: banner.id,
+                imageUrl: cleanPath,
+                title: banner.title || '',
+                subtitle: banner.subtitle || '',
+                createdAt: banner.created_at.toISOString(),
+                filePath: cleanPath
+            };
+        });
+    } catch (error) {
+        console.error('Error fetching banners:', error);
+        throw error;
+    }
 }
 
 export async function addBanner(data: AddBannerData): Promise<Banner> {
