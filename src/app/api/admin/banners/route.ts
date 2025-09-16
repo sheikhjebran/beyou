@@ -35,7 +35,9 @@ async function POSTHandler(request: NextRequest) {
         let file: File | null = null;
         let title = '';
         let subtitle = '';
-        let processedViaManualParsing = false;
+        
+        // First, clone the request so we can try manual parsing if needed
+        const requestClone = request.clone();
         
         try {
             const formData = await request.formData();
@@ -44,11 +46,13 @@ async function POSTHandler(request: NextRequest) {
             file = formData.get('imageFile') as File;
             title = formData.get('title') as string || '';
             subtitle = formData.get('subtitle') as string || '';
+            
+            console.log('Standard FormData parsing succeeded');
         } catch (parseError) {
             console.error('Standard FormData parsing failed, trying manual parser:', parseError);
             
             try {
-                const parsedData = await parseMultipartFormData(request.clone());
+                const parsedData = await parseMultipartFormData(requestClone);
                 console.log('Manual parser succeeded. Fields:', Object.keys(parsedData.fields), 'Files:', Object.keys(parsedData.files));
                 
                 title = parsedData.fields.title || '';
@@ -70,8 +74,9 @@ async function POSTHandler(request: NextRequest) {
                     console.log('Banner added successfully via manual parsing:', banner.id);
                     return NextResponse.json(banner);
                 } else {
+                    console.error('No file found in manual parsing');
                     return NextResponse.json(
-                        { message: 'No file found in manual parsing' },
+                        { message: 'No file found in request' },
                         { status: 400 }
                     );
                 }
