@@ -4,8 +4,19 @@
 
 USE beyou_db;
 
--- Drop the existing foreign key constraint
-ALTER TABLE sales DROP FOREIGN KEY sales_ibfk_1;
+-- Check if the foreign key exists before attempting to drop it
+SET @fk_exists = (
+  SELECT COUNT(*)
+  FROM information_schema.TABLE_CONSTRAINTS
+  WHERE CONSTRAINT_NAME = 'sales_ibfk_1'
+    AND TABLE_NAME = 'sales'
+    AND TABLE_SCHEMA = DATABASE()
+);
+
+IF @fk_exists THEN
+  -- Drop the existing foreign key constraint
+  ALTER TABLE sales DROP FOREIGN KEY sales_ibfk_1;
+END IF;
 
 -- Add the foreign key constraint with CASCADE DELETE
 -- This allows products to be deleted even if they have sales records
