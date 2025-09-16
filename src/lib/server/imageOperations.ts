@@ -1,15 +1,15 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-
-export const UPLOADS_DIR = path.join(process.cwd(), 'public', 'uploads');
+import { getUploadDirectory, getPublicPath } from './paths';
 
 const VALID_DIRECTORIES = ['products', 'banners', 'categories', 'profiles'];
 
 // Ensure upload directories exist
 export async function ensureUploadDirs() {
+    const uploadDir = getUploadDirectory();
     const dirs = VALID_DIRECTORIES.map(
-        dir => path.join(UPLOADS_DIR, dir)
+        dir => path.join(uploadDir, dir)
     );
 
     for (const dir of dirs) {
@@ -30,16 +30,17 @@ export async function saveUploadedFile(buffer: Buffer, originalName: string, cat
     const filename = `${uuidv4()}${ext}`;
     
     // Create full path
-    const relativePath = path.join('uploads', category, filename).replace(/\\/g, '/');
-    const fullPath = path.join(process.cwd(), 'public', relativePath);
+    const uploadDir = getUploadDirectory();
+    const storagePath = path.join(uploadDir, category, filename);
     
     // Save file
-    await fs.writeFile(fullPath, buffer);
+    await fs.writeFile(storagePath, buffer);
     
-    // Return file info
+    // Return file info with public path
+    const publicPath = getPublicPath(storagePath);
     return {
         filename,
-        path: relativePath
+        path: publicPath.replace(/^\//, '') // Remove leading slash to match existing behavior
     };
 }
 
@@ -47,11 +48,12 @@ export async function deleteUploadedFile(imagePath: string): Promise<void> {
     if (!imagePath) return;
     
     try {
-        const fullPath = path.join(process.cwd(), 'public', imagePath);
+        const uploadDir = getUploadDirectory();
+        const fullPath = path.join(uploadDir, imagePath.replace(/^\/uploads\//, ''));
 
         // Security check: ensure the file is within the uploads directory
         const normalizedPath = path.normalize(fullPath);
-        if (!normalizedPath.startsWith(UPLOADS_DIR)) {
+        if (!normalizedPath.startsWith(uploadDir)) {
             throw new Error('Invalid file path');
         }
 

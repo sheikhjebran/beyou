@@ -15,13 +15,37 @@ jobs:
           username: root
           password: ${{ secrets.SSH_PASSWORD }}
           script: |
+            # Create persistent storage if it doesn't exist
+            mkdir -p /var/www/beyou-uploads
+
+            # Clean persistent storage before backup
+            rm -rf /var/www/beyou-uploads/*
+
+            # Create fresh backup of uploads
+            if [ -d "/var/www/beyou/public/uploads" ]; then
+              cp -r /var/www/beyou/public/uploads/* /var/www/beyou-uploads/ 2>/dev/null || true
+            fi
+
             cd /var/www/beyou
             git config --global --add safe.directory /var/www/beyou
             git remote set-url origin https://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@github.com/sheikhjebran/beyou.git
-            git reset --hard
+
+            # Stash any local changes
+            git stash
             git pull origin feature/new_latest_migration_mysql
             mv .env.local .env.local.backup
+
+            # Create uploads directory if it doesn't exist
+            mkdir -p public/uploads
+
+            # Restore uploads from persistent storage
+            cp -r /var/www/beyou-uploads/* public/uploads/ 2>/dev/null || true
+
             npm ci
             npm run migrate:server
             npm run build
+
+            # Ensure uploads are preserved after build
+            cp -r /var/www/beyou-uploads/* public/uploads/ 2>/dev/null || true
+
             pm2 restart beyou || pm2 start beyou
