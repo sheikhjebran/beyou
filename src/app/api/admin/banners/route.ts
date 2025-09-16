@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as bannerService from '@/services/server/bannerService';
 import { withAdminAuth } from '@/middleware/admin-auth';
+import { parseMultipartFormData } from '@/lib/parseMultipartFormData';
 
 // GET /api/admin/banners - Get all banners
 async function GETHandler(request: NextRequest) {
@@ -31,29 +32,77 @@ async function POSTHandler(request: NextRequest) {
         }
 
         console.log('Parsing FormData...');
-        const formData = await request.formData();
-        console.log('FormData keys:', Array.from(formData.keys()));
+        let file: File | null = null;
+        let title = '';
+        let subtitle = '';
+        let processedViaManualParsing = false;
         
-        const file = formData.get('imageFile') as File;
-        const title = formData.get('title') as string;
-        const subtitle = formData.get('subtitle') as string;
+        try {
+            const formData = await request.formData();
+            console.log('FormData keys:', Array.from(formData.keys()));
+            
+            file = formData.get('imageFile') as File;
+            title = formData.get('title') as string || '';
+            subtitle = formData.get('subtitle') as string || '';
+        } catch (parseError) {
+            console.error('Standard FormData parsing failed, trying manual parser:', parseError);
+            
+            try {
+                const parsedData = await parseMultipartFormData(request.clone());
+                console.log('Manual parser succeeded. Fields:', Object.keys(parsedData.fields), 'Files:', Object.keys(parsedData.files));
+                
+                title = parsedData.fields.title || '';
+                subtitle = parsedData.fields.subtitle || '';
+                
+                if (parsedData.files.imageFile) {
+                    const fileData = parsedData.files.imageFile;
+                    // For manual parsing, process directly with buffer
+                    const buffer = fileData.buffer;
 
+                    console.log('Manual parsing - calling server addBanner function directly...');
+                    const banner = await bannerService.addBanner({
+                        imageBuffer: buffer,
+                        originalFilename: fileData.name,
+                        title,
+                        subtitle,
+                    });
+
+                    console.log('Banner added successfully via manual parsing:', banner.id);
+                    return NextResponse.json(banner);
+                } else {
+                    return NextResponse.json(
+                        { message: 'No file found in manual parsing' },
+                        { status: 400 }
+                    );
+                }
+            } catch (manualParseError) {
+                console.error('Manual FormData parsing also failed:', manualParseError);
+                return NextResponse.json(
+                    { message: 'Failed to parse FormData with both methods', error: manualParseError instanceof Error ? manualParseError.message : 'Unknown parsing error' },
+                    { status: 400 }
+                );
+            }
+        }
+
+        // Standard FormData parsing succeeded, continue with normal flow
         console.log('Extracted data:', {
             fileExists: !!file,
             fileName: file?.name,
             fileSize: file?.size,
+            fileType: file?.type,
             title,
             subtitle
         });
 
-        if (!file) {
-            console.error('No file provided in the request.');
+        if (!file || !(file instanceof File)) {
+            console.error('No valid file provided in the request.');
             return NextResponse.json(
-                { message: 'No file provided' },
+                { message: 'No valid file provided' },
                 { status: 400 }
             );
         }
 
+        console.log('Converting file to buffer...');
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
 
@@ -69,6 +118,7 @@ async function POSTHandler(request: NextRequest) {
         return NextResponse.json(banner);
     } catch (error) {
         console.error('Error adding banner:', error);
+        console.error('Error stack:', error instanceof Error ? error.stack : 'No stack available');
         return NextResponse.json(
             { 
                 message: 'Error adding banner', 
