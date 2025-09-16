@@ -26,16 +26,29 @@ export async function getAdminBanners(): Promise<Banner[]> {
 }
 
 export async function addAdminBanner(data: AddBannerData): Promise<Banner> {
+    console.log('addAdminBanner called with:', {
+        hasImageFile: !!data.imageFile,
+        imageFileName: data.imageFile?.name,
+        imageFileSize: data.imageFile?.size,
+        title: data.title,
+        subtitle: data.subtitle
+    });
+
     const formData = new FormData();
     formData.append('imageFile', data.imageFile);
     if (data.title) formData.append('title', data.title);
     if (data.subtitle) formData.append('subtitle', data.subtitle);
+
+    console.log('FormData created, making request to /api/admin/banners');
 
     const response = await fetch('/api/admin/banners', {
         method: 'POST',
         credentials: 'include',
         body: formData,
     });
+
+    console.log('Response status:', response.status);
+    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
     return handleDatabaseResponse<Banner>(response);
 }

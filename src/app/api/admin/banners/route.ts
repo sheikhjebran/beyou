@@ -20,6 +20,8 @@ async function GETHandler(request: NextRequest) {
 async function POSTHandler(request: NextRequest) {
     try {
         const contentType = request.headers.get('content-type');
+        console.log('Request content-type:', contentType);
+        
         if (!contentType || !contentType.includes('multipart/form-data')) {
             console.error('Invalid content-type:', contentType);
             return NextResponse.json(
@@ -28,10 +30,21 @@ async function POSTHandler(request: NextRequest) {
             );
         }
 
+        console.log('Parsing FormData...');
         const formData = await request.formData();
+        console.log('FormData keys:', Array.from(formData.keys()));
+        
         const file = formData.get('imageFile') as File;
         const title = formData.get('title') as string;
         const subtitle = formData.get('subtitle') as string;
+
+        console.log('Extracted data:', {
+            fileExists: !!file,
+            fileName: file?.name,
+            fileSize: file?.size,
+            title,
+            subtitle
+        });
 
         if (!file) {
             console.error('No file provided in the request.');
@@ -44,6 +57,7 @@ async function POSTHandler(request: NextRequest) {
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
 
+        console.log('Calling server addBanner function...');
         const banner = await bannerService.addBanner({
             imageBuffer: buffer,
             originalFilename: file.name,
@@ -51,11 +65,15 @@ async function POSTHandler(request: NextRequest) {
             subtitle,
         });
 
+        console.log('Banner added successfully:', banner.id);
         return NextResponse.json(banner);
     } catch (error) {
         console.error('Error adding banner:', error);
         return NextResponse.json(
-            { message: 'Error adding banner', error: error.message },
+            { 
+                message: 'Error adding banner', 
+                error: error instanceof Error ? error.message : 'Unknown error'
+            },
             { status: 500 }
         );
     }

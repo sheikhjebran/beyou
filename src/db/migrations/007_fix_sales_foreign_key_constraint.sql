@@ -19,7 +19,10 @@ PREPARE stmt FROM @drop_fk_query;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
--- Add the foreign key constraint with CASCADE DELETE
+-- First, modify the product_id column to allow NULL values
+ALTER TABLE sales MODIFY COLUMN product_id VARCHAR(36) NULL;
+
+-- Add the foreign key constraint with ON DELETE SET NULL
 ALTER TABLE sales ADD CONSTRAINT sales_product_fk 
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL;
 
