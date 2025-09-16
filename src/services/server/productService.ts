@@ -465,6 +465,8 @@ export async function updateProduct(id: string, updates: Partial<Product>): Prom
     }
 }
 
+import { deleteImageFromServer } from '@/lib/server/imageStorage';
+
 export async function deleteProduct(id: string): Promise<boolean> {
     console.log('Server deleteProduct called with ID:', id);
     const connection = await pool.getConnection();
@@ -472,20 +474,34 @@ export async function deleteProduct(id: string): Promise<boolean> {
         await connection.beginTransaction();
         console.log('Transaction started for product deletion');
 
-        // First, check if product exists
-        const [checkResult] = await connection.query('SELECT id, name FROM products WHERE id = ?', [id]) as any;
-        console.log('Product lookup result:', checkResult);
+        // First, check if product exists and get image paths
+        const [product] = await connection.query('SELECT id, name FROM products WHERE id = ?', [id]) as any;
+        console.log('Product lookup result:', product);
         
-        if (checkResult.length === 0) {
+        if (product.length === 0) {
             console.log('Product not found with ID:', id);
             await connection.rollback();
             return false;
         }
 
-        console.log('Found product to delete:', checkResult[0].name);
+        console.log('Found product to delete:', product[0].name);
 
-        // Delete related images first
-        console.log('Deleting product images...');
+        // Get all image paths before deleting from database
+        const [images] = await connection.query('SELECT image_path FROM product_images WHERE product_id = ?', [id]) as any;
+        
+        // Delete images from storage
+        for (const image of images) {
+            if (image.image_path) {
+                const deleteResult = await deleteImageFromServer(image.image_path);
+                if (!deleteResult.success) {
+                    console.error(`Failed to delete file ${image.image_path}:`, deleteResult.error);
+                    // Continue with deletion even if file removal fails
+                }
+            }
+        }
+
+        // Delete related images from database
+        console.log('Deleting product images from database...');
         const [imageDeleteResult] = await connection.query('DELETE FROM product_images WHERE product_id = ?', [id]) as any;
         console.log('Deleted', imageDeleteResult.affectedRows, 'product images');
 

@@ -2,6 +2,8 @@ import connection from '@/lib/server/mysql';
 import { unlink } from 'fs/promises';
 import path from 'path';
 
+import { deleteImageFromServer } from '@/lib/server/imageStorage';
+
 export async function deleteProductImage(productId: string, imagePath: string): Promise<{ success: boolean, error?: string }> {
     const conn = await connection.getConnection();
     try {
@@ -31,12 +33,10 @@ export async function deleteProductImage(productId: string, imagePath: string): 
             [productId, imagePath]
         );
 
-        // Try to delete the actual file
-        try {
-            const absolutePath = path.join(process.cwd(), 'public', imagePath);
-            await unlink(absolutePath);
-        } catch (err) {
-            console.warn('File deletion failed, but database updated:', err);
+        // Delete the file from storage
+        const deleteResult = await deleteImageFromServer(imagePath);
+        if (!deleteResult.success) {
+            console.warn('File deletion failed, but database updated:', deleteResult.error);
         }
 
         await conn.commit();

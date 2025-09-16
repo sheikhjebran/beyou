@@ -38,7 +38,7 @@ export async function addBanner(data: AddBannerData): Promise<Banner> {
     const imagePath = await uploadImageToServer(
         data.imageBuffer,
         data.originalFilename,
-        `banners/${id}`
+        'banners'
     );
     
     const banner = await executeQuery<any[]>(
@@ -56,17 +56,7 @@ export async function addBanner(data: AddBannerData): Promise<Banner> {
     };
 }
 
-async function deleteImage(imagePath: string): Promise<void> {
-    try {
-        // Remove the leading slash and /uploads/ prefix if present
-        const relativePath = imagePath.replace(/^\/+/, '').replace(/^uploads\//, '');
-        const fullPath = path.join(process.cwd(), 'public', 'uploads', relativePath);
-        await fs.unlink(fullPath);
-    } catch (error) {
-        console.error('Error deleting image:', error);
-        // Don't throw here - we want to continue with banner deletion even if file deletion fails
-    }
-}
+import { deleteImageFromServer } from '@/lib/server/imageStorage';
 
 export async function deleteBanner(bannerId: string): Promise<void> {
     const [banner] = await executeQuery<any[]>(
@@ -75,7 +65,7 @@ export async function deleteBanner(bannerId: string): Promise<void> {
     );
 
     if (banner && banner.image_path) {
-        await deleteImage(banner.image_path);
+        await deleteImageFromServer(banner.image_path);
     }
 
     await executeQuery(

@@ -30,7 +30,19 @@ export async function updateCategoryImage(categoryId: string, imagePath: string)
     );
 }
 
+import { deleteImageFromServer } from '@/lib/server/imageStorage';
+
 export async function deleteCategoryImage(categoryId: string): Promise<void> {
+    // First get the image path
+    const [categoryImage] = await executeQuery<any[]>(
+        'SELECT image_path FROM category_images WHERE category_id = ?',
+        [categoryId]
+    );
+
+    if (categoryImage && categoryImage.image_path) {
+        await deleteImageFromServer(categoryImage.image_path);
+    }
+
     await executeQuery(
         'DELETE FROM category_images WHERE category_id = ?',
         [categoryId]
