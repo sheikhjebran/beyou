@@ -10,11 +10,9 @@ export const metadata: Metadata = {
 export default async function Page({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }) {
-  const resolvedParams = await params;
-  const id = resolvedParams.id;
-  const product = await getAdminProduct(id);
+  const product = await getAdminProduct(params.id);
 
   if (!product) {
     return (
@@ -32,6 +30,3 @@ export default async function Page({
     </div>
   );
 }
-
-// Use withAdminAuth with both the component and page route
-// Protect the page with admin authentication

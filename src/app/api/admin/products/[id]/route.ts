@@ -46,10 +46,18 @@ async function handlePATCH(
 }
 
 // Export handler functions wrapped with admin auth
-export async function GET(request: NextRequest, context: { params: { id: string } }) {
-  return withAdminAuth(request, (req) => handleGET(req, context));
-}
+export const GET = async (
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) => {
+  const resolvedParams = await params;
+  return withAdminAuth(request, (req) => handleGET(req, { params: resolvedParams }));
+};
 
-export async function PATCH(request: NextRequest, context: { params: { id: string } }) {
-  return withAdminAuth(request, (req) => handlePATCH(req, context));
-}
+export const PATCH = async (
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) => {
+  const resolvedParams = await params;
+  return withAdminAuth(request, (req) => handlePATCH(req, { params: resolvedParams }));
+};

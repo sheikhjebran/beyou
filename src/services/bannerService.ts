@@ -14,6 +14,10 @@ export async function getBanners(): Promise<Banner[]> {
 }
 
 // Admin endpoints
+// Aliases for backward compatibility
+export const addBanner = addAdminBanner;
+export const deleteBanner = deleteAdminBanner;
+
 export async function getAdminBanners(): Promise<Banner[]> {
     const response = await fetch('/api/admin/banners', {
         credentials: 'include' // Important for sending admin cookies
