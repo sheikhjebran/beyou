@@ -171,14 +171,35 @@ export default function CustomizePage() {
   };
 
   const onBannerSubmit: SubmitHandler<BannerFormValues> = async (data) => {
+    console.log('onBannerSubmit called with data:', {
+      hasImageFile: !!data.imageFile,
+      imageFileName: data.imageFile?.name,
+      imageFileSize: data.imageFile?.size,
+      imageFileType: data.imageFile?.type,
+      title: data.title,
+      subtitle: data.subtitle
+    });
+    
     if (!data.imageFile) {
       setBannerError("Please select an image file.");
       return;
     }
+    
+    if (!(data.imageFile instanceof File)) {
+      setBannerError("Invalid file selected.");
+      return;
+    }
+    
     setIsSubmittingBanner(true);
     setBannerError(null);
     try {
       // Pass title and subtitle, which might be empty strings from the form if not filled
+      console.log('Calling addBanner with:', {
+        imageFile: data.imageFile,
+        title: data.title,
+        subtitle: data.subtitle,
+      });
+      
       await addBanner({
         imageFile: data.imageFile,
         title: data.title,
@@ -191,6 +212,7 @@ export default function CustomizePage() {
       const fetchedBanners = await getBanners();
       setBanners(fetchedBanners);
     } catch (err) {
+      console.error('Banner submission error:', err);
       toast({ variant: "destructive", title: "Error Adding Banner", description: err instanceof Error ? err.message : "An unexpected error occurred." });
     } finally {
       setIsSubmittingBanner(false);

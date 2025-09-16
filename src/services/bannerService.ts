@@ -30,14 +30,44 @@ export async function addAdminBanner(data: AddBannerData): Promise<Banner> {
         hasImageFile: !!data.imageFile,
         imageFileName: data.imageFile?.name,
         imageFileSize: data.imageFile?.size,
+        imageFileType: data.imageFile?.type,
         title: data.title,
         subtitle: data.subtitle
     });
 
     const formData = new FormData();
+    
+    // Verify the file is valid before appending
+    if (!data.imageFile || !(data.imageFile instanceof File)) {
+        throw new Error('Invalid or missing image file');
+    }
+    
+    console.log('Appending file to FormData:', {
+        name: data.imageFile.name,
+        size: data.imageFile.size,
+        type: data.imageFile.type
+    });
+    
     formData.append('imageFile', data.imageFile);
-    if (data.title) formData.append('title', data.title);
-    if (data.subtitle) formData.append('subtitle', data.subtitle);
+    
+    if (data.title) {
+        console.log('Appending title:', data.title);
+        formData.append('title', data.title);
+    }
+    if (data.subtitle) {
+        console.log('Appending subtitle:', data.subtitle);
+        formData.append('subtitle', data.subtitle);
+    }
+
+    // Log FormData contents for debugging
+    console.log('FormData entries:');
+    for (const [key, value] of formData.entries()) {
+        if (value instanceof File) {
+            console.log(`${key}: File(${value.name}, ${value.size} bytes, ${value.type})`);
+        } else {
+            console.log(`${key}: ${value}`);
+        }
+    }
 
     console.log('FormData created, making request to /api/admin/banners');
 
@@ -49,6 +79,12 @@ export async function addAdminBanner(data: AddBannerData): Promise<Banner> {
 
     console.log('Response status:', response.status);
     console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Response error body:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+    }
 
     return handleDatabaseResponse<Banner>(response);
 }
