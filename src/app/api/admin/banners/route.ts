@@ -23,15 +23,53 @@ async function POSTHandler(request: NextRequest) {
         const contentType = request.headers.get('content-type');
         console.log('Request content-type:', contentType);
         
+        if (contentType && contentType.includes('application/json')) {
+            // Handle JSON request with base64 encoded file
+            console.log('Processing JSON request with base64 file...');
+            
+            const requestData = await request.json();
+            console.log('Request data received:', {
+                hasImageFile: !!requestData.imageFile,
+                imageFileName: requestData.imageFile?.name,
+                imageFileSize: requestData.imageFile?.size,
+                title: requestData.title,
+                subtitle: requestData.subtitle
+            });
+            
+            if (!requestData.imageFile || !requestData.imageFile.data) {
+                return NextResponse.json(
+                    { message: 'No file data provided' },
+                    { status: 400 }
+                );
+            }
+            
+            // Convert base64 back to buffer
+            const base64Data = requestData.imageFile.data;
+            const buffer = Buffer.from(base64Data, 'base64');
+            
+            console.log('Converted base64 to buffer, size:', buffer.length);
+            
+            const banner = await bannerService.addBanner({
+                imageBuffer: buffer,
+                originalFilename: requestData.imageFile.name,
+                title: requestData.title,
+                subtitle: requestData.subtitle,
+            });
+
+            console.log('Banner added successfully via JSON:', banner.id);
+            return NextResponse.json(banner);
+        }
+        
+        // Fallback to FormData handling for backward compatibility
         if (!contentType || !contentType.includes('multipart/form-data')) {
             console.error('Invalid content-type:', contentType);
             return NextResponse.json(
-                { message: 'Invalid content-type. Expected multipart/form-data.' },
+                { message: 'Invalid content-type. Expected application/json or multipart/form-data.' },
                 { status: 400 }
             );
         }
 
-        console.log('Parsing FormData...');
+        console.log('Processing FormData request...');
         let file: File | null = null;
         let title = '';
         let subtitle = '';

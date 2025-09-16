@@ -35,46 +35,37 @@ export async function addAdminBanner(data: AddBannerData): Promise<Banner> {
         subtitle: data.subtitle
     });
 
-    const formData = new FormData();
-    
-    // Verify the file is valid before appending
+    // Verify the file is valid before processing
     if (!data.imageFile || !(data.imageFile instanceof File)) {
         throw new Error('Invalid or missing image file');
     }
     
-    console.log('Appending file to FormData:', {
-        name: data.imageFile.name,
-        size: data.imageFile.size,
-        type: data.imageFile.type
-    });
+    console.log('Converting file to base64...');
     
-    formData.append('imageFile', data.imageFile);
+    // Convert file to base64 instead of using FormData
+    const arrayBuffer = await data.imageFile.arrayBuffer();
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
     
-    if (data.title) {
-        console.log('Appending title:', data.title);
-        formData.append('title', data.title);
-    }
-    if (data.subtitle) {
-        console.log('Appending subtitle:', data.subtitle);
-        formData.append('subtitle', data.subtitle);
-    }
+    const requestData = {
+        imageFile: {
+            data: base64,
+            name: data.imageFile.name,
+            type: data.imageFile.type,
+            size: data.imageFile.size
+        },
+        title: data.title || '',
+        subtitle: data.subtitle || ''
+    };
 
-    // Log FormData contents for debugging
-    console.log('FormData entries:');
-    for (const [key, value] of formData.entries()) {
-        if (value instanceof File) {
-            console.log(`${key}: File(${value.name}, ${value.size} bytes, ${value.type})`);
-        } else {
-            console.log(`${key}: ${value}`);
-        }
-    }
-
-    console.log('FormData created, making request to /api/admin/banners');
+    console.log('Sending as JSON with base64 data, file size:', requestData.imageFile.size);
 
     const response = await fetch('/api/admin/banners', {
         method: 'POST',
         credentials: 'include',
-        body: formData,
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData),
     });
 
     console.log('Response status:', response.status);
