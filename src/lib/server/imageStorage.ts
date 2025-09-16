@@ -10,23 +10,45 @@ export type UploadedImage = {
 
 export async function uploadImageToServer(fileBuffer: Buffer, originalFilename: string, subDirectory: string): Promise<UploadedImage> {
     try {
+        // Validate the buffer
+        if (!fileBuffer || fileBuffer.length === 0) {
+            throw new Error('Invalid file buffer');
+        }
+
+        // Validate file extension
+        const extension = path.extname(originalFilename).toLowerCase();
+        const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+        if (!allowedExtensions.includes(extension)) {
+            throw new Error('Invalid file type. Only jpg, jpeg, png, gif, and webp files are allowed.');
+        }
+
         // Create a unique filename
-        const extension = path.extname(originalFilename);
         const filename = `${uuidv4()}${extension}`;
         
-        // Simplify the directory structure
+        // Normalize the subdirectory
+        const normalizedSubDir = subDirectory.split('/')[0].replace(/[^a-zA-Z0-9-]/g, '');
+        
+        // Set up the directory structure
         const baseDir = path.join(process.cwd(), 'public', 'uploads');
-        const categoryDir = path.join(baseDir, subDirectory.split('/')[0]); // Just use the first part of subDirectory
-        await mkdir(categoryDir, { recursive: true });
+        const categoryDir = path.join(baseDir, normalizedSubDir);
+        
+        // Ensure the directory exists with proper permissions
+        await mkdir(baseDir, { recursive: true, mode: 0o755 });
+        await mkdir(categoryDir, { recursive: true, mode: 0o755 });
         
         // Create the full path with flattened structure
         const fullPath = path.join(categoryDir, filename);
         
-        // Write the file
-        await writeFile(fullPath, fileBuffer);
+        // Write the file with proper permissions
+        await writeFile(fullPath, fileBuffer, { mode: 0o644 });
         
-        // Create public path with forward slashes
-        const publicPath = `/uploads/${subDirectory.split('/')[0]}/${filename}`;
+        // Create public path with forward slashes for URLs
+        const publicPath = `/uploads/${normalizedSubDir}/${filename}`;
+        
+        // Verify the file was written successfully
+        if (!existsSync(fullPath)) {
+            throw new Error('Failed to verify file creation');
+        }
         
         return {
             filename,
@@ -34,7 +56,7 @@ export async function uploadImageToServer(fileBuffer: Buffer, originalFilename: 
         };
     } catch (error) {
         console.error('Error uploading image:', error);
-        throw new Error('Failed to upload image');
+        throw new Error(error instanceof Error ? error.message : 'Failed to upload image');
     }
 }
 

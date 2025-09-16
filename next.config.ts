@@ -14,7 +14,7 @@ const nextConfig: NextConfig = {
     typedRoutes: false
   },
   images: {
-    domains: ['localhost'],
+    domains: ['localhost', 'beyoushop.in'],
     remotePatterns: [
       {
         protocol: 'https',
@@ -22,9 +22,10 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: '**',
+        hostname: 'beyoushop.in',
       }
     ],
+    unoptimized: true, // This will serve original images without optimization
   },
   async rewrites() {
     return [
