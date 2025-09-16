@@ -6,12 +6,32 @@ import { uploadImage, deleteImage } from '@/lib/imageStorage';
 // Verify user function
 export async function verifyUser(userId: string): Promise<User> {
     try {
+        // First try to find in admin_users table
+        const [admins] = await executeQuery<any[]>(
+            'SELECT id, email, role FROM admin_users WHERE id = ?',
+            [userId]
+        );
+
+        if (admins && admins.length > 0) {
+            const admin = admins[0];
+            return {
+                id: admin.id,
+                email: admin.email,
+                display_name: 'Admin',
+                profile_image_path: null,
+                role: admin.role,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            };
+        }
+
+        // If not an admin, check regular users
         const [users] = await executeQuery<any[]>(
             'SELECT id, email, display_name, profile_image_path, role, created_at, updated_at FROM users WHERE id = ?',
             [userId]
         );
 
-        if (!users || (users as any[]).length === 0) {
+        if (!users || users.length === 0) {
             throw new Error('User not found');
         }
 

@@ -48,9 +48,10 @@ export async function POST(request: Request) {
       console.log('Creating JWT token...');
       const token = sign(
         { 
-          userId: user.id,
+          id: user.id, // Changed from userId to id
           email: user.email,
-          role: user.role
+          role: user.role,
+          type: 'admin'
         },
         JWT_SECRET,
         { expiresIn: '24h' }

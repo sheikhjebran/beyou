@@ -4,6 +4,8 @@ import { headers } from 'next/headers';
 
 import { verifyUser } from '@/services/server/authService';
 
+import { verifyAdminAuth } from '@/lib/server/admin-auth';
+
 export async function withAdminAuth(request: NextRequest, handler: (request: NextRequest) => Promise<NextResponse>) {
   try {
     // Get the token from cookie
@@ -16,21 +18,29 @@ export async function withAdminAuth(request: NextRequest, handler: (request: Nex
     }
 
     try {
-      // Verify the token and get user data
-      const user = await verifyUser(token);
-      console.log('User verified:', user.email);
+      // Verify the token and get admin data
+      const admin = await verifyAdminAuth(request);
+      
+      if (!admin) {
+        console.log('Admin verification failed');
+        return NextResponse.json({ error: 'Unauthorized - Invalid admin token' }, { status: 401 });
+      }
+      
+      console.log('Admin verified:', admin.email);
 
-      // Add user data to the request headers for use in the handler
-      const requestWithUser = new Request(request.url, {
+      // Add admin data to the request headers for use in the handler
+      const requestWithAdmin = new Request(request.url, {
+        method: request.method,
         headers: new Headers({
           ...Object.fromEntries(request.headers),
-          'x-user-id': user.id,
-          'x-user-email': user.email,
+          'x-admin-id': admin.id,
+          'x-admin-email': admin.email,
+          'x-admin-role': admin.role,
         }),
       });
 
       // Continue to the handler if authenticated
-      return await handler(requestWithUser as NextRequest);
+      return await handler(requestWithAdmin as NextRequest);
     } catch (verifyError) {
       console.error('Token verification failed:', verifyError);
       return NextResponse.json({ error: 'Unauthorized - Invalid token' }, { status: 401 });
