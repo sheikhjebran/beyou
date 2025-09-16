@@ -19,12 +19,22 @@ async function GETHandler(request: NextRequest) {
 // POST /api/admin/banners - Add new banner
 async function POSTHandler(request: NextRequest) {
     try {
+        const contentType = request.headers.get('content-type');
+        if (!contentType || !contentType.includes('multipart/form-data')) {
+            console.error('Invalid content-type:', contentType);
+            return NextResponse.json(
+                { message: 'Invalid content-type. Expected multipart/form-data.' },
+                { status: 400 }
+            );
+        }
+
         const formData = await request.formData();
         const file = formData.get('imageFile') as File;
         const title = formData.get('title') as string;
         const subtitle = formData.get('subtitle') as string;
 
         if (!file) {
+            console.error('No file provided in the request.');
             return NextResponse.json(
                 { message: 'No file provided' },
                 { status: 400 }
@@ -38,14 +48,14 @@ async function POSTHandler(request: NextRequest) {
             imageBuffer: buffer,
             originalFilename: file.name,
             title,
-            subtitle
+            subtitle,
         });
 
         return NextResponse.json(banner);
     } catch (error) {
         console.error('Error adding banner:', error);
         return NextResponse.json(
-            { message: 'Error adding banner' },
+            { message: 'Error adding banner', error: error.message },
             { status: 500 }
         );
     }
