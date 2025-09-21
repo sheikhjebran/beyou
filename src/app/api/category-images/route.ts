@@ -42,12 +42,11 @@ export async function PUT(request: NextRequest) {
             );
         }
 
-        const { uploadImageToServer } = await import('@/lib/server/imageStorage');
+        const { saveUploadedFile } = await import('@/lib/server/imageOperations');
         const bytes = await imageFile.arrayBuffer();
         const buffer = Buffer.from(bytes);
-        const subDirectory = `categories/${categoryId}`;
-        const uploadedImage = await uploadImageToServer(buffer, imageFile.name, subDirectory);
-        const imagePath = uploadedImage.path;
+        const uploadResult = await saveUploadedFile(buffer, imageFile.name, 'categories');
+        const imagePath = uploadResult.path;
 
         await categoryImageService.updateCategoryImage(categoryId, imagePath);
         

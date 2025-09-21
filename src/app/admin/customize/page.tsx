@@ -380,7 +380,7 @@ export default function CustomizePage() {
                   </FormControl>
                   {bannerImagePreviewUrl && (
                     <div className="mt-4 relative w-48 h-24 aspect-video mx-auto">
-                      <Image src={bannerImagePreviewUrl} alt="New banner preview" fill className="object-contain rounded-md border" />
+                      <LoadingImage src={bannerImagePreviewUrl} alt="New banner preview" fill imgClassName="object-contain rounded-md border" />
                     </div>
                   )}
                   <FormMessage />
@@ -500,7 +500,7 @@ export default function CustomizePage() {
                       <Skeleton className="w-full h-48 rounded-md" />
                     ) : categoryImagePreviewUrl ? (
                       <div className="relative w-full h-48 aspect-video border rounded-md overflow-hidden bg-muted/30">
-                        <Image src={categoryImagePreviewUrl} alt={`Current image for ${watchedCategory}`} fill className="object-contain" data-ai-hint={`${watchedCategory.toLowerCase()} category display`} />
+                        <LoadingImage src={categoryImagePreviewUrl} alt={`Current image for ${watchedCategory}`} fill imgClassName="object-contain" data-ai-hint={`${watchedCategory.toLowerCase()} category display`} />
                       </div>
                     ) : (
                       <div className="w-full h-48 border-2 border-dashed rounded-lg flex items-center justify-center bg-muted/50 text-muted-foreground">
