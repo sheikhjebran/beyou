@@ -49,7 +49,7 @@ export type UpdateProductData = {
     isBestSeller?: boolean;
     imageFiles?: FileList | null;
     newPrimaryImageIndexForUpload?: number;
-    makeExistingImagePrimary?: number;
+    makeExistingImagePrimary?: string;
 };
 
 export type PaginatedProducts = {
@@ -195,15 +195,63 @@ export async function addProduct(productData: AddProductData): Promise<string> {
 }
 
 export async function updateProduct(productId: string, productData: UpdateProductData): Promise<void> {
-    const response = await fetch(`/api/products?id=${productId}`, {
-        method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(productData),
-    });
-    if (!response.ok) {
-        throw new Error('Failed to update product');
+    try {
+        // Prepare the data to send to the server
+        const updateData: any = { ...productData };
+        
+        // Handle image uploads if new files are provided
+        if (productData.imageFiles && productData.imageFiles.length > 0) {
+            console.log('Uploading new images...');
+            
+            // Upload images first
+            const uploadedImages = await Promise.all(
+                Array.from(productData.imageFiles).map((file: File) => uploadImage(file, 'products'))
+            );
+            
+            console.log('Uploaded images:', uploadedImages);
+            
+            // Convert uploaded images to paths
+            const imagePaths = uploadedImages.map(img => img.path);
+            updateData.image_paths = imagePaths;
+            
+            // Set primary image path based on the index
+            if (typeof productData.newPrimaryImageIndexForUpload === 'number' && 
+                productData.newPrimaryImageIndexForUpload < imagePaths.length) {
+                updateData.primary_image_path = imagePaths[productData.newPrimaryImageIndexForUpload];
+            } else {
+                updateData.primary_image_path = imagePaths[0]; // Default to first image
+            }
+            
+            console.log('Setting image_paths:', updateData.image_paths);
+            console.log('Setting primary_image_path:', updateData.primary_image_path);
+        } else if (productData.makeExistingImagePrimary) {
+            // No new files, but changing which existing image is primary
+            console.log('Making existing image primary:', productData.makeExistingImagePrimary);
+            updateData.primary_image_path = productData.makeExistingImagePrimary;
+        }
+        
+        // Remove the client-side specific fields before sending to server
+        delete updateData.imageFiles;
+        delete updateData.newPrimaryImageIndexForUpload;
+        delete updateData.makeExistingImagePrimary;
+        
+        console.log('Sending update data to server:', updateData);
+        
+        const response = await fetch(`/api/products?id=${productId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(updateData),
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || 'Failed to update product');
+        }
+    } catch (error) {
+        console.error('Error in updateProduct:', error);
+        throw error;
     }
 }
 

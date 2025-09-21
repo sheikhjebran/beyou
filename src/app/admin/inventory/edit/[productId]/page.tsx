@@ -54,7 +54,7 @@ interface UpdateProductPayload {
   is_best_seller?: boolean; // Server expects this field name
   imageFiles?: File[] | null;
   newPrimaryImageIndexForUpload?: number;
-  makeExistingImagePrimary?: number;
+  makeExistingImagePrimary?: string;
 }
 
 const productFormSchema = z.object({
@@ -442,7 +442,7 @@ export default function EditProductPage() {
         is_best_seller: Boolean(dataToUpdate.isBestSeller ?? productData.is_best_seller ?? false),
         imageFiles: dataToUpdate.imageFiles ?? null,
         newPrimaryImageIndexForUpload: dataToUpdate.newPrimaryImageIndexForUpload,
-        makeExistingImagePrimary: dataToUpdate.makeExistingImagePrimary ? Number(dataToUpdate.makeExistingImagePrimary) : undefined,
+        makeExistingImagePrimary: dataToUpdate.makeExistingImagePrimary,
       };
 
       await updateProduct(productId, updatePayload as any);
