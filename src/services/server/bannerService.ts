@@ -1,9 +1,7 @@
 import { executeQuery } from '@/lib/server/mysql';
-import { uploadImageToServer } from '@/lib/server/imageStorage';
+import { saveUploadedFile } from '@/lib/server/imageOperations';
 import type { Banner } from '@/types/banner';
 import { v4 as uuidv4 } from 'uuid';
-import { promises as fs } from 'fs';
-import path from 'path';
 
 export interface AddBannerData {
     imageBuffer: Buffer;
@@ -52,7 +50,9 @@ export async function getBanners(): Promise<Banner[]> {
 
 export async function addBanner(data: AddBannerData): Promise<Banner> {
     const id = uuidv4();
-    const imagePath = await uploadImageToServer(
+    
+    // Use the new image operations system that handles both local and production paths
+    const uploadResult = await saveUploadedFile(
         data.imageBuffer,
         data.originalFilename,
         'banners'
@@ -60,20 +60,20 @@ export async function addBanner(data: AddBannerData): Promise<Banner> {
     
     const banner = await executeQuery<any[]>(
         'INSERT INTO banners (id, image_path, title, subtitle) VALUES (?, ?, ?, ?)',
-        [id, imagePath.path, data.title, data.subtitle]
+        [id, uploadResult.path, data.title, data.subtitle]
     );
 
     return {
         id,
-        imageUrl: imagePath.path,
+        imageUrl: uploadResult.path,
         title: data.title || '',
         subtitle: data.subtitle || '',
         createdAt: new Date().toISOString(),
-        filePath: imagePath.path
+        filePath: uploadResult.path
     };
 }
 
-import { deleteImageFromServer } from '@/lib/server/imageStorage';
+import { deleteUploadedFile } from '@/lib/server/imageOperations';
 
 export async function deleteBanner(bannerId: string): Promise<void> {
     const [banner] = await executeQuery<any[]>(
@@ -82,7 +82,7 @@ export async function deleteBanner(bannerId: string): Promise<void> {
     );
 
     if (banner && banner.image_path) {
-        await deleteImageFromServer(banner.image_path);
+        await deleteUploadedFile(banner.image_path);
     }
 
     await executeQuery(
