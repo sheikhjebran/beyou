@@ -45,6 +45,10 @@ export function LoadingImage(props: Props) {
     if (src.startsWith('http://') || src.startsWith('https://')) {
       return src;
     }
+    // Convert /uploads paths to use API route
+    if (src.startsWith('/uploads')) {
+      return `/api${src}`;
+    }
     // For local images, ensure they start with a forward slash
     return src.startsWith('/') ? src : `/${src}`;
   };

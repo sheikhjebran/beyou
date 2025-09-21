@@ -78,7 +78,10 @@ export function BannerManager() {
             <TableRow key={banner.id}>
               <TableCell>
                 <Image
-                  src={banner.imageUrl}
+                  src={banner.imageUrl.startsWith('/uploads') 
+                    ? `/api${banner.imageUrl}` 
+                    : banner.imageUrl
+                  }
                   alt={banner.title || 'Banner image'}
                   width={100}
                   height={50}
