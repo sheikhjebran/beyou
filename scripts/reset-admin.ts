@@ -14,7 +14,7 @@ async function resetAdminUser() {
 
         // Delete existing admin user
         await connection.execute(
-            'DELETE FROM admin_users WHERE email = ?',
+            'DELETE FROM users WHERE email = ?',
             ['admin@beyou.com']
         );
 
@@ -24,7 +24,7 @@ async function resetAdminUser() {
 
         // Create new admin user
         const [result] = await connection.execute(
-            'INSERT INTO admin_users (id, email, password) VALUES (?, ?, ?)',
+            'INSERT INTO users (id, email, password) VALUES (?, ?, ?)',
             ['admin-001', 'admin@beyou.com', hashedPassword]
         );
 
