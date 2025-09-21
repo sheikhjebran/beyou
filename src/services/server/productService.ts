@@ -48,8 +48,8 @@ const formatPath = (path: string | null): string => {
     if (path.startsWith('http://') || path.startsWith('https://')) {
         return path;
     }
-    // Ensure path starts with /uploads/ and remove any duplicate slashes
-    const normalizedPath = path.replace(/^\/?(uploads\/)?/, '');
+    // Normalize backslashes to forward slashes for URLs
+    const normalizedPath = path.replace(/\\/g, '/').replace(/^\/?(uploads\/)?/, '');
     return `/uploads/${normalizedPath}`;
 };
 
@@ -57,7 +57,11 @@ const sanitizeJsonString = (str: string | null): string | null => {
     if (!str) return null;
     const trimmed = str.trim();
     if (!trimmed) return null;
-    return trimmed.startsWith('[') ? trimmed : `[${trimmed}]`;
+    
+    // Normalize backslashes to forward slashes for URLs before JSON parsing
+    const normalizedStr = trimmed.replace(/\\/g, '/');
+    
+    return normalizedStr.startsWith('[') ? normalizedStr : `[${normalizedStr}]`;
 };
 
 // Image Processing Functions (Depends on Base Utilities)

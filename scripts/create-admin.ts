@@ -8,7 +8,10 @@ async function createAdminUser() {
             host: process.env.MYSQL_HOST || 'localhost',
             user: process.env.MYSQL_USER || 'root',
             password: process.env.MYSQL_PASSWORD || '',
-            database: process.env.MYSQL_DATABASE || 'beyou_db'
+            database: process.env.MYSQL_DATABASE || 'beyou_db',
+            authPlugins: {
+                mysql_native_password: () => () => Buffer.alloc(0),
+            }
         });
 
         // Create admin users table if it doesn't exist

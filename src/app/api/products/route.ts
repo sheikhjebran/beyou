@@ -63,9 +63,12 @@ export async function POST(request: NextRequest) {
         const price = Number(formData.get('price'));
         const stock_quantity = Number(formData.get('stock_quantity')) || 0; // Default to 0 if null
         
-        // Get image paths from the pre-uploaded images
-        const image_paths = formData.getAll('imagePaths').map(path => path.toString());
-        const primary_image_path = formData.get('primaryImagePath')?.toString() || image_paths[0] || null;
+        // Get image paths from the pre-uploaded images and normalize them
+        const image_paths = formData.getAll('imagePaths').map(path => 
+            path.toString().replace(/\\/g, '/').replace(/^\/?(uploads\/)?/, '/uploads/')
+        );
+        const primary_image_path = formData.get('primaryImagePath')?.toString()
+            .replace(/\\/g, '/').replace(/^\/?(uploads\/)?/, '/uploads/') || image_paths[0] || null;
         
         // Log the received image data
         console.log('Received image data:', {
@@ -117,7 +120,7 @@ export async function PUT(request: NextRequest) {
         }
 
         const data = await request.json();
-        await productService.updateProduct(productId, data);
+        const result = await productService.updateProduct(productId, data);
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error('Error in PUT /api/products:', error);

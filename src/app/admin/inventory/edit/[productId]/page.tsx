@@ -43,6 +43,20 @@ const MAX_FILE_SIZE_MB = 5;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
+// Local interface that matches what the server expects
+interface UpdateProductPayload {
+  name?: string;
+  description?: string;
+  price?: number;
+  stock_quantity?: number; // Server expects this field name
+  category?: string;
+  subcategory?: string; // Server expects this field name (not sub_category)
+  is_best_seller?: boolean; // Server expects this field name
+  imageFiles?: File[] | null;
+  newPrimaryImageIndexForUpload?: number;
+  makeExistingImagePrimary?: number;
+}
+
 const productFormSchema = z.object({
   name: z.string().min(3, { message: "Product name must be at least 3 characters." }),
   category: z.string().min(1, { message: "Please select a category." }),
@@ -415,23 +429,23 @@ export default function EditProductPage() {
 
 
     try {
-      // Ensure all required fields are present for UpdateProductData
-      const updatePayload: UpdateProductData = {
+      // Ensure all required fields are present for UpdateProductPayload
+      const updatePayload: UpdateProductPayload = {
         name: dataToUpdate.name ?? productData.name,
         category: dataToUpdate.category ?? productData.category,
         description: dataToUpdate.description ?? productData.description ?? '',
         price: dataToUpdate.price ?? productData.price,
-        stockQuantity: dataToUpdate.stockQuantity ?? productData.stock_quantity,
-        subCategory: (dataToUpdate.subCategory ?? productData.subcategory) !== undefined
+        stock_quantity: dataToUpdate.stockQuantity ?? productData.stock_quantity,
+        subcategory: (dataToUpdate.subCategory ?? productData.subcategory) !== undefined
           ? String(dataToUpdate.subCategory ?? productData.subcategory)
           : '', // Always a string, never undefined
-        isBestSeller: Boolean(dataToUpdate.isBestSeller ?? productData.is_best_seller ?? false),
+        is_best_seller: Boolean(dataToUpdate.isBestSeller ?? productData.is_best_seller ?? false),
         imageFiles: dataToUpdate.imageFiles ?? null,
         newPrimaryImageIndexForUpload: dataToUpdate.newPrimaryImageIndexForUpload,
-        makeExistingImagePrimary: dataToUpdate.makeExistingImagePrimary,
+        makeExistingImagePrimary: dataToUpdate.makeExistingImagePrimary ? Number(dataToUpdate.makeExistingImagePrimary) : undefined,
       };
 
-      await updateProduct(productId, updatePayload);
+      await updateProduct(productId, updatePayload as any);
       toast({
         title: "Product Updated",
         description: `Product "${values.name || productData.name}" has been successfully updated.`,

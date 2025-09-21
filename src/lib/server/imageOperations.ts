@@ -40,7 +40,7 @@ export async function saveUploadedFile(buffer: Buffer, originalName: string, cat
     const publicPath = getPublicPath(storagePath);
     return {
         filename,
-        path: publicPath.replace(/^\//, '') // Remove leading slash to match existing behavior
+        path: publicPath // Keep the full path with /uploads/ prefix
     };
 }
 

@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from "@/hooks/use-toast";
-import { addBanner, getBanners, deleteBanner, type AddBannerData } from '@/services/bannerService';
+import { addBanner, getBanners, deleteBanner, addAdminBannerWithProgress, type AddBannerData } from '@/services/bannerService';
 import type { Banner } from '@/types/banner';
 import { Loader2, UploadCloud, Trash2, ImagePlus, AlertCircle, Palette, RefreshCcw } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -79,6 +79,11 @@ export default function CustomizePage() {
   const [showDeleteBannerDialog, setShowDeleteBannerDialog] = useState(false);
   const [bannerToDelete, setBannerToDelete] = useState<Banner | null>(null);
   const [isDeletingBanner, setIsDeletingBanner] = useState(false);
+  
+  // Progress tracking states
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState<string>('');
+  const [isUploading, setIsUploading] = useState(false);
 
   const bannerForm = useForm<BannerFormValues>({
     resolver: zodResolver(bannerFormSchema),
@@ -191,21 +196,32 @@ export default function CustomizePage() {
     }
     
     setIsSubmittingBanner(true);
+    setIsUploading(true);
+    setUploadProgress(0);
+    setUploadStatus('Starting upload...');
     setBannerError(null);
+    
     try {
       // Pass title and subtitle, which might be empty strings from the form if not filled
-      console.log('Calling addBanner with:', {
+      console.log('Calling addAdminBannerWithProgress with:', {
         imageFile: data.imageFile,
         title: data.title,
         subtitle: data.subtitle,
       });
       
-      await addBanner({
+      await addAdminBannerWithProgress({
         imageFile: data.imageFile,
         title: data.title,
         subtitle: data.subtitle,
+      }, (progress, status) => {
+        setUploadProgress(Math.round(progress));
+        setUploadStatus(status);
       });
-      toast({ title: "Banner Added", description: "New banner successfully uploaded." });
+      
+      toast({ 
+        title: "Banner Added Successfully", 
+        description: `Banner "${data.title || 'Untitled'}" has been uploaded and added to your collection.`
+      });
       bannerForm.reset();
       setBannerImagePreviewUrl(null);
       // Re-fetch banners to update list
@@ -213,9 +229,16 @@ export default function CustomizePage() {
       setBanners(fetchedBanners);
     } catch (err) {
       console.error('Banner submission error:', err);
-      toast({ variant: "destructive", title: "Error Adding Banner", description: err instanceof Error ? err.message : "An unexpected error occurred." });
+      toast({ 
+        variant: "destructive", 
+        title: "Upload Failed", 
+        description: `Failed to add banner: ${err instanceof Error ? err.message : "An unexpected error occurred."}` 
+      });
     } finally {
       setIsSubmittingBanner(false);
+      setIsUploading(false);
+      setUploadProgress(0);
+      setUploadStatus('');
     }
   };
   
@@ -258,7 +281,7 @@ export default function CustomizePage() {
       if (currentCategoryData) {
         setCategoryImagePreviewUrl(currentCategoryData.imageUrl);
       } else if (watchedCategory) {
-        setCategoryImagePreviewUrl(`https://placehold.co/400x300.png?text=${encodeURIComponent(watchedCategory)}`);
+        setCategoryImagePreviewUrl(`/coming-soon.png`);
       } else {
         setCategoryImagePreviewUrl(null);
       }
@@ -291,7 +314,7 @@ export default function CustomizePage() {
   };
 
   const openDeleteCatImgConfirmationDialog = (categoryName: string) => {
-     if (!categoryName || !currentCategoryData?.imageUrl || currentCategoryData.imageUrl.includes('placehold.co')) {
+     if (!categoryName || !currentCategoryData?.imageUrl || currentCategoryData.imageUrl.includes('coming-soon.png')) {
       toast({ variant: "default", title: "No Custom Image", description: `There is no custom image to delete for "${categoryName}".` });
       return;
     }
@@ -307,7 +330,7 @@ export default function CustomizePage() {
       await deleteCategoryImage(categoryToDeleteImageFor);
       toast({ title: "Category Image Deleted", description: `Custom image for "${categoryToDeleteImageFor}" has been removed.` });
       setCurrentCategoryData(null); // Clear current image data
-      setCategoryImagePreviewUrl(`https://placehold.co/400x300.png?text=${encodeURIComponent(categoryToDeleteImageFor)}`); // Revert to placeholder
+      setCategoryImagePreviewUrl(`/coming-soon.png`); // Revert to placeholder
       categoryImageForm.resetField('categoryImageFile');
     } catch (err) {
       setCategoryImageError(err instanceof Error ? err.message : "Failed to delete category image.");
@@ -364,8 +387,29 @@ export default function CustomizePage() {
               )} />
               <FormField control={bannerForm.control} name="title" render={({ field }) => (<FormItem><FormLabel>Title (Optional)</FormLabel><FormControl><Input placeholder="e.g., Summer Collection Out Now!" {...field} /></FormControl><FormMessage /></FormItem>)} />
               <FormField control={bannerForm.control} name="subtitle" render={({ field }) => (<FormItem><FormLabel>Subtitle (Optional)</FormLabel><FormControl><Textarea placeholder="e.g., Fresh styles to brighten your wardrobe." {...field} /></FormControl><FormMessage /></FormItem>)} />
-              <Button type="submit" disabled={isSubmittingBanner || !bannerForm.formState.isValid} className="w-full md:w-auto">
-                {isSubmittingBanner ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImagePlus className="mr-2 h-4 w-4" />} Add Banner
+              
+              {/* Progress Indicator */}
+              {isUploading && (
+                <div className="space-y-2 p-4 bg-muted rounded-md">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">Uploading...</span>
+                    <span className="text-muted-foreground">{uploadProgress}%</span>
+                  </div>
+                  <div className="w-full bg-background rounded-full h-2">
+                    <div 
+                      className="bg-primary h-2 rounded-full transition-all duration-300 ease-in-out" 
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                  {uploadStatus && (
+                    <p className="text-xs text-muted-foreground mt-1">{uploadStatus}</p>
+                  )}
+                </div>
+              )}
+              
+              <Button type="submit" disabled={isSubmittingBanner || !bannerForm.formState.isValid || isUploading} className="w-full md:w-auto">
+                {isSubmittingBanner || isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImagePlus className="mr-2 h-4 w-4" />} 
+                {isUploading ? 'Uploading...' : 'Add Banner'}
               </Button>
             </form>
           </Form>

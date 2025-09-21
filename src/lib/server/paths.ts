@@ -14,7 +14,9 @@ export function getUploadDirectory(): string {
 // Function to convert storage path to public URL path
 export function getPublicPath(filePath: string): string {
     const uploadDir = getUploadDirectory();
-    return filePath.replace(uploadDir, '/uploads');
+    // Normalize the path and replace backslashes with forward slashes for URLs
+    const relativePath = filePath.replace(uploadDir, '').replace(/\\/g, '/');
+    return `/uploads${relativePath.startsWith('/') ? relativePath : `/${relativePath}`}`;
 }
 
 // Function to convert public URL path to storage path

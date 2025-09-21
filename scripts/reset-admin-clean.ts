@@ -1,0 +1,37 @@
+import mysql from 'mysql2/promise';
+import bcrypt from 'bcrypt';
+
+async function resetAdminUser() {
+    try {
+        const connection = await mysql.createConnection({
+            host: process.env.MYSQL_HOST || 'localhost',
+            user: process.env.MYSQL_USER || 'root',
+            password: process.env.MYSQL_PASSWORD || '',
+            database: process.env.MYSQL_DATABASE || 'beyou_db',
+            connectTimeout: 60000,
+        });
+
+        await connection.execute(
+            'DELETE FROM admin_users WHERE email = ?',
+            ['admin@beyou.com']
+        );
+
+        const saltRounds = 10;
+        const hashedPassword = await bcrypt.hash('admin123', saltRounds);
+
+        const [result] = await connection.execute(
+            'INSERT INTO admin_users (id, email, password) VALUES (?, ?, ?)',
+            ['admin-001', 'admin@beyou.com', hashedPassword]
+        );
+
+        console.log('Admin user reset successfully!');
+        console.log('Email: admin@beyou.com');
+        console.log('Password: admin123');
+        
+        await connection.end();
+    } catch (error) {
+        console.error('Error resetting admin user:', error);
+    }
+}
+
+resetAdminUser();

@@ -45,6 +45,11 @@ export type UpdateProductData = {
     category?: string;
     sub_category?: string;
     is_best_seller?: boolean;
+    subCategory?: string;
+    isBestSeller?: boolean;
+    imageFiles?: FileList | null;
+    newPrimaryImageIndexForUpload?: number;
+    makeExistingImagePrimary?: number;
 };
 
 export type PaginatedProducts = {

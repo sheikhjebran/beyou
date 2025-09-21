@@ -26,11 +26,22 @@ async function POSTHandler(request: NextRequest) {
             });
             
             if (!base64Data) {
+                console.log('Missing URL parameters:', { hasData: !!base64Data, hasFilename: !!filename });
                 return NextResponse.json(
                     { message: 'No data provided in URL' },
                     { status: 400 }
                 );
             }
+
+            if (!filename) {
+                console.log('Missing filename parameter');
+                return NextResponse.json(
+                    { message: 'No filename provided' },
+                    { status: 400 }
+                );
+            }
+            
+            console.log('Processing base64 data...');
             
             try {
                 const buffer = Buffer.from(base64Data, 'base64');
