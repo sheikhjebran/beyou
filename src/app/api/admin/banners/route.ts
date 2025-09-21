@@ -27,7 +27,30 @@ async function POSTHandler(request: NextRequest) {
             // Handle JSON request with base64 encoded file
             console.log('Processing JSON request with base64 file...');
             
-            const requestData = await request.json();
+            let requestData;
+            try {
+                // Check if request body exists and has content
+                const bodyText = await request.text();
+                console.log('Raw request body length:', bodyText.length);
+                console.log('Raw request body preview:', bodyText.substring(0, 100) + (bodyText.length > 100 ? '...' : ''));
+                
+                if (!bodyText || bodyText.length === 0) {
+                    console.error('Empty request body received');
+                    return NextResponse.json(
+                        { message: 'Empty request body' },
+                        { status: 400 }
+                    );
+                }
+                
+                requestData = JSON.parse(bodyText);
+            } catch (parseError) {
+                console.error('JSON parsing failed:', parseError);
+                return NextResponse.json(
+                    { message: 'Invalid JSON in request body', error: parseError instanceof Error ? parseError.message : 'Unknown error' },
+                    { status: 400 }
+                );
+            }
+            
             console.log('Request data received:', {
                 hasImageFile: !!requestData.imageFile,
                 imageFileName: requestData.imageFile?.name,

@@ -40,44 +40,79 @@ export async function addAdminBanner(data: AddBannerData): Promise<Banner> {
         throw new Error('Invalid or missing image file');
     }
     
-    console.log('Converting file to base64...');
+    console.log('Using simple binary upload method...');
     
-    // Convert file to base64 instead of using FormData
-    const arrayBuffer = await data.imageFile.arrayBuffer();
-    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-    
-    const requestData = {
-        imageFile: {
-            data: base64,
-            name: data.imageFile.name,
-            type: data.imageFile.type,
-            size: data.imageFile.size
-        },
-        title: data.title || '',
-        subtitle: data.subtitle || ''
-    };
+    try {
+        // Convert file to ArrayBuffer for binary upload
+        const arrayBuffer = await data.imageFile.arrayBuffer();
+        
+        console.log('Sending binary data, size:', arrayBuffer.byteLength);
 
-    console.log('Sending as JSON with base64 data, file size:', requestData.imageFile.size);
+        const response = await fetch('/api/admin/banners/upload', {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/octet-stream',
+                'X-Filename': data.imageFile.name,
+                'X-Title': data.title || '',
+                'X-Subtitle': data.subtitle || ''
+            },
+            body: arrayBuffer,
+        });
 
-    const response = await fetch('/api/admin/banners', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData),
-    });
+        console.log('Response status:', response.status);
+        console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
-    console.log('Response status:', response.status);
-    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Response error body:', errorText);
+            throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
 
-    if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Response error body:', errorText);
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
+        return handleDatabaseResponse<Banner>(response);
+        
+    } catch (error) {
+        console.error('Binary upload failed, falling back to base64...', error);
+        
+        // Fallback to base64 method
+        console.log('Converting file to base64...');
+        
+        // Convert file to base64 instead of using FormData
+        const arrayBuffer = await data.imageFile.arrayBuffer();
+        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+        
+        const requestData = {
+            imageFile: {
+                data: base64,
+                name: data.imageFile.name,
+                type: data.imageFile.type,
+                size: data.imageFile.size
+            },
+            title: data.title || '',
+            subtitle: data.subtitle || ''
+        };
+
+        console.log('Sending as JSON with base64 data, file size:', requestData.imageFile.size);
+
+        const response = await fetch('/api/admin/banners', {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestData),
+        });
+
+        console.log('Fallback response status:', response.status);
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Fallback response error body:', errorText);
+            throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+
+        return handleDatabaseResponse<Banner>(response);
     }
-
-    return handleDatabaseResponse<Banner>(response);
 }
 
 export async function deleteAdminBanner(bannerId: string): Promise<void> {
