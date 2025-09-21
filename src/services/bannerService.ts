@@ -40,47 +40,57 @@ export async function addAdminBanner(data: AddBannerData): Promise<Banner> {
         throw new Error('Invalid or missing image file');
     }
     
-    console.log('Using simple binary upload method...');
+    console.log('Converting file to base64 for alternative upload...');
     
     try {
-        // Convert file to ArrayBuffer for binary upload
-        const arrayBuffer = await data.imageFile.arrayBuffer();
-        
-        console.log('Sending binary data, size:', arrayBuffer.byteLength);
-
-        const response = await fetch('/api/admin/banners/upload', {
-            method: 'POST',
-            credentials: 'include',
-            headers: {
-                'Content-Type': 'application/octet-stream',
-                'X-Filename': data.imageFile.name,
-                'X-Title': data.title || '',
-                'X-Subtitle': data.subtitle || ''
-            },
-            body: arrayBuffer,
-        });
-
-        console.log('Response status:', response.status);
-        console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Response error body:', errorText);
-            throw new Error(`HTTP ${response.status}: ${errorText}`);
-        }
-
-        return handleDatabaseResponse<Banner>(response);
-        
-    } catch (error) {
-        console.error('Binary upload failed, falling back to base64...', error);
-        
-        // Fallback to base64 method
-        console.log('Converting file to base64...');
-        
-        // Convert file to base64 instead of using FormData
+        // Convert file to base64
         const arrayBuffer = await data.imageFile.arrayBuffer();
         const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
         
+        console.log('Base64 conversion complete, length:', base64.length);
+        
+        // Method 1: Try URL-based upload for smaller files (< 8000 chars to stay under URL limits)
+        if (base64.length < 8000) {
+            console.log('Using URL-based upload method...');
+            
+            const params = new URLSearchParams({
+                method: 'url_upload',
+                data: base64,
+                filename: data.imageFile.name,
+                title: data.title || '',
+                subtitle: data.subtitle || ''
+            });
+            
+            const response = await fetch(`/api/admin/banners/alternative?${params.toString()}`, {
+                method: 'POST',
+                credentials: 'include',
+            });
+            
+            console.log('URL upload response status:', response.status);
+            
+            if (response.ok) {
+                console.log('URL upload successful!');
+                return handleDatabaseResponse<Banner>(response);
+            } else {
+                const errorText = await response.text();
+                console.error('URL upload failed:', errorText);
+                throw new Error(`URL upload failed: ${response.status}`);
+            }
+        }
+        
+        // Method 2: Try chunk-based upload for larger files
+        console.log('File too large for URL method, trying chunked upload...');
+        
+        // Split base64 into chunks
+        const chunkSize = 4000; // Safe chunk size
+        const chunks = [];
+        for (let i = 0; i < base64.length; i += chunkSize) {
+            chunks.push(base64.substring(i, i + chunkSize));
+        }
+        
+        console.log(`Splitting into ${chunks.length} chunks`);
+        
+        // For now, let's try a simpler approach - use the alternative endpoint with POST body
         const requestData = {
             imageFile: {
                 data: base64,
@@ -91,10 +101,10 @@ export async function addAdminBanner(data: AddBannerData): Promise<Banner> {
             title: data.title || '',
             subtitle: data.subtitle || ''
         };
-
-        console.log('Sending as JSON with base64 data, file size:', requestData.imageFile.size);
-
-        const response = await fetch('/api/admin/banners', {
+        
+        console.log('Trying alternative endpoint with POST body...');
+        
+        const response = await fetch('/api/admin/banners/alternative', {
             method: 'POST',
             credentials: 'include',
             headers: {
@@ -102,16 +112,20 @@ export async function addAdminBanner(data: AddBannerData): Promise<Banner> {
             },
             body: JSON.stringify(requestData),
         });
-
-        console.log('Fallback response status:', response.status);
-
+        
+        console.log('Alternative endpoint response status:', response.status);
+        
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('Fallback response error body:', errorText);
-            throw new Error(`HTTP ${response.status}: ${errorText}`);
+            console.error('Alternative endpoint failed:', errorText);
+            throw new Error(`Alternative upload failed: ${response.status} - ${errorText}`);
         }
-
+        
         return handleDatabaseResponse<Banner>(response);
+        
+    } catch (error) {
+        console.error('All upload methods failed:', error);
+        throw error;
     }
 }
 
