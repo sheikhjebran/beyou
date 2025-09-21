@@ -16,14 +16,13 @@ jobs:
           password: ${{ secrets.SSH_PASSWORD }}
           script: |
             # Create persistent storage if it doesn't exist
-            mkdir -p /var/www/beyou-uploads
+            mkdir -p /var/www/beyou/uploads
 
-            # Clean persistent storage before backup
-            rm -rf /var/www/beyou-uploads/*
-
-            # Create fresh backup of uploads
-            if [ -d "/var/www/beyou/public/uploads" ]; then
-              cp -r /var/www/beyou/public/uploads/* /var/www/beyou-uploads/ 2>/dev/null || true
+            # Clean and backup current uploads
+            if [ -d "/var/www/beyou/uploads" ]; then
+              # Create backup
+              mkdir -p /var/www/beyou-uploads-backup
+              cp -r /var/www/beyou/uploads/* /var/www/beyou-uploads-backup/ 2>/dev/null || true
             fi
 
             cd /var/www/beyou
@@ -35,17 +34,23 @@ jobs:
             git pull origin feature/new_latest_migration_mysql
             mv .env.local .env.local.backup
 
-            # Create uploads directory if it doesn't exist
-            mkdir -p public/uploads
+            # Ensure production uploads directory exists and has proper permissions
+            mkdir -p /var/www/beyou/uploads/banners
+            mkdir -p /var/www/beyou/uploads/products
+            mkdir -p /var/www/beyou/uploads/categories
+            mkdir -p /var/www/beyou/uploads/profiles
 
-            # Restore uploads from persistent storage
-            cp -r /var/www/beyou-uploads/* public/uploads/ 2>/dev/null || true
+            # Restore uploads from backup
+            if [ -d "/var/www/beyou-uploads-backup" ]; then
+              cp -r /var/www/beyou-uploads-backup/* /var/www/beyou/uploads/ 2>/dev/null || true
+            fi
+
+            # Set proper permissions for uploads directory
+            chown -R www-data:www-data /var/www/beyou/uploads
+            chmod -R 755 /var/www/beyou/uploads
 
             npm ci
             npm run migrate:server
             npm run build
-
-            # Ensure uploads are preserved after build
-            cp -r /var/www/beyou-uploads/* public/uploads/ 2>/dev/null || true
 
             pm2 restart beyou || pm2 start beyou

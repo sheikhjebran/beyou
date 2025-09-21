@@ -58,7 +58,12 @@ export async function deleteUploadedFile(imagePath: string): Promise<void> {
         }
 
         await fs.unlink(fullPath);
-    } catch (error) {
+    } catch (error: any) {
+        // If file doesn't exist, that's okay - consider it already deleted
+        if (error.code === 'ENOENT') {
+            console.log(`File already deleted or doesn't exist: ${imagePath}`);
+            return;
+        }
         console.error('Error deleting image:', error);
         throw error;
     }
