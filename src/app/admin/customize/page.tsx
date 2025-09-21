@@ -6,6 +6,7 @@ import { useForm, SubmitHandler, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Image from 'next/image';
+import LoadingImage from '@/components/loading-image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -431,7 +432,15 @@ export default function CustomizePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {banners.map((banner) => (
                 <Card key={banner.id} className="flex flex-col">
-                  <div className="relative w-full h-40 aspect-video"><Image src={banner.imageUrl} alt={banner.title || 'Banner image'} fill className="object-cover rounded-t-lg" sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"/></div>
+                  <div className="relative w-full h-40 aspect-video">
+                    <LoadingImage 
+                      src={banner.imageUrl} 
+                      alt={banner.title || 'Banner image'} 
+                      fill 
+                      imgClassName="object-cover rounded-t-lg" 
+                      sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    />
+                  </div>
                   <CardContent className="p-4 space-y-2 flex-grow">
                     {banner.title && <h3 className="font-semibold text-lg truncate" title={banner.title}>{banner.title}</h3>}
                     {banner.subtitle && <p className="text-sm text-muted-foreground line-clamp-2" title={banner.subtitle}>{banner.subtitle}</p>}
