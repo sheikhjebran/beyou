@@ -1,7 +1,7 @@
 import path from 'path';
 
 // Define base paths for uploads
-export const PERSISTENT_UPLOAD_DIR = '/var/www/beyou-uploads';
+export const PERSISTENT_UPLOAD_DIR = process.env.UPLOAD_DIR || '/var/www/beyou/uploads';
 export const PUBLIC_UPLOAD_DIR = path.join(process.cwd(), 'public/uploads');
 
 // Function to get the appropriate upload directory based on environment
