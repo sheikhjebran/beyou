@@ -5,10 +5,11 @@ import { getStoragePath } from '@/lib/server/paths';
 
 export async function GET(
     request: NextRequest,
-    { params }: { params: { path: string[] } }
+    { params }: { params: Promise<{ path: string[] }> }
 ) {
     try {
-        const filePath = `/${params.path.join('/')}`;
+        const resolvedParams = await params;
+        const filePath = `/${resolvedParams.path.join('/')}`;
         const publicPath = `/uploads${filePath}`;
         
         // Convert to storage path
