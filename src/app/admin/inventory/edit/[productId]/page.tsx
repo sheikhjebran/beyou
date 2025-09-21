@@ -32,7 +32,7 @@ import Link from 'next/link';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Product } from '@/types/product';
-import Image from 'next/image';
+import { LoadingImage } from '@/components/loading-image';
 import { getMainCategories, getSubCategories, type Category } from '@/lib/categories';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
@@ -528,7 +528,7 @@ export default function EditProductPage() {
                                     {currentImagePreviews.map((url, index) => (
                                         <div key={`current-${index}`} className="relative aspect-square group">
                                             <div className="relative w-full h-full">
-                                                <Image 
+                                                <LoadingImage 
                                                     src={url} 
                                                     alt={`Current image ${index + 1}`} 
                                                     fill 
@@ -577,7 +577,7 @@ export default function EditProductPage() {
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                                     {newImagePreviews.map((url, index) => (
                                         <div key={`new-${index}`} className="relative aspect-square group cursor-pointer" onClick={() => handleNewPreviewClick(index)}>
-                                            <Image src={url} alt={`New preview ${index + 1}`} fill className={`object-cover rounded-md border-2 ${index === primaryImageMarker ? 'border-primary ring-2 ring-primary' : 'border-transparent'}`} />
+                                            <LoadingImage src={url} alt={`New preview ${index + 1}`} fill className={`object-cover rounded-md border-2 ${index === primaryImageMarker ? 'border-primary ring-2 ring-primary' : 'border-transparent'}`} />
                                             {index === primaryImageMarker && <Badge variant="default" className="absolute top-1 left-1 text-xs z-10">Primary</Badge>}
                                             <Button type="button" variant="destructive" size="icon" className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity z-20" onClick={(e) => {e.stopPropagation(); removeNewPreviewImage(index)}}>
                                                 <XCircle className="h-4 w-4" />
