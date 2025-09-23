@@ -21,6 +21,7 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 const profileFormSchema = z.object({
   displayName: z.string().min(2, { message: "Display name must be at least 2 characters." }).optional().or(z.literal('')),
+  currentPassword: z.string().optional(),
   newPassword: z.string().optional().refine(val => !val || val.length >= 6, {
     message: "New password must be at least 6 characters if provided.",
   }),
@@ -31,6 +32,18 @@ const profileFormSchema = z.object({
       file => !file || ["image/jpeg", "image/png", "image/webp"].includes(file.type),
       "Only .jpg, .png, and .webp formats are supported."
     ),
+}).refine(data => {
+  if (data.newPassword && data.newPassword !== data.confirmPassword) {
+    return false;
+  }
+  // If new password is provided, current password is required
+  if (data.newPassword && !data.currentPassword) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Current password is required when changing password.",
+  path: ["currentPassword"],
 }).refine(data => {
   if (data.newPassword && data.newPassword !== data.confirmPassword) {
     return false;
@@ -111,9 +124,10 @@ export default function ProfilePage() {
       }
 
       // Update password
-      if (data.newPassword) {
-        await updateUserPassword(data.newPassword);
+      if (data.newPassword && data.currentPassword) {
+        await updateUserPassword(data.currentPassword, data.newPassword);
         toast({ title: "Success", description: "Password updated successfully." });
+        form.resetField("currentPassword");
         form.resetField("newPassword");
         form.resetField("confirmPassword");
         changesMade = true;
@@ -253,6 +267,19 @@ export default function ProfilePage() {
               <CardDescription>Leave blank if you don't want to change your password.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              <FormField
+                control={form.control}
+                name="currentPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Current Password</FormLabel>
+                    <FormControl>
+                      <Input type="password" placeholder="••••••••" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <FormField
                 control={form.control}
                 name="newPassword"

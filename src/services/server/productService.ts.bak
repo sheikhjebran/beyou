@@ -1,0 +1,763 @@
+import pool, { executeQuery } from '@/lib/server/mysql';
+import { Product } from '@/types/product';
+import { saveFile, deleteFile } from '@/lib/fileUpload';
+import { v4 as uuidv4 } from 'uuid';
+
+// Constants and Types
+const DEFAULT_PRIMARY_IMAGE_URL = 'https://placehold.co/400x300.png';
+type ImageInfo = { path: string; isPrimary: boolean };
+
+// Image Processing Functions
+const formatImagePath = (path: string | null): string => {
+    if (!path) return DEFAULT_PRIMARY_IMAGE_URL;
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+        return path;
+    }
+    return path.startsWith('/uploads/') ? path : `/uploads/${path.replace(/^\//, '')}`;
+};
+
+// JSON Processing
+const wrapInArray = (str: string | null): string | null => {
+    if (!str) return null;
+    const trimmed = str.trim();
+    if (!trimmed) return null;
+    return trimmed.startsWith('[') ? trimmed : `[${trimmed}]`;
+};
+
+const parseImageJson = (imageString: string | null): ImageInfo[] => {
+    const validJson = wrapInArray(imageString);
+    if (!validJson) return [];
+    
+    try {
+        const parsed = JSON.parse(validJson) as ImageInfo[];
+        return Array.isArray(parsed) ? 
+            parsed.filter(img => img && typeof img.path === 'string') : 
+            [];
+    } catch (error) {
+        console.error('Error parsing image JSON:', error);
+        return [];
+    }
+};
+
+const processImageList = (images: ImageInfo[]): string[] => {
+    return images.map(img => formatImagePath(img.path));
+};
+
+// Helper functions for image processing
+const processImagePath = (path: string | null): string => {
+    if (!path) return DEFAULT_PRIMARY_IMAGE_URL;
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+        return path;
+    }
+    return path.startsWith('/uploads/') ? path : `/uploads/${path.replace(/^\//, '')}`;
+};
+
+const ensureValidJson = (str: string | null): string | null => {
+    if (!str) return null;
+    return str.trim().startsWith('[') ? str : `[${str}]`;
+};
+
+const parseImages = (imageString: string | null): ImageInfo[] => {
+    const validJson = ensureValidJson(imageString);
+    if (!validJson) return [];
+    
+    try {
+        const parsed = JSON.parse(validJson) as ImageInfo[];
+        return Array.isArray(parsed) ? 
+            parsed.filter(img => img && typeof img.path === 'string') : 
+            [];
+    } catch (error) {
+        console.error('Error parsing image string:', error);
+        return [];
+    }
+};
+
+const processImages = (images: ImageInfo[]): string[] => {
+    return images.map(img => processImagePath(img.path));
+};
+
+// Helper function to process images and return URLs
+const getImageData = (imageString: string | null, primaryImagePath?: string | null): { primaryImageUrl: string; imageUrls: string[] } => {
+    console.log('Getting image data:', { imageString, primaryImagePath });
+    
+    // Parse the images from the JSON string
+    const images = parseImages(imageString);
+    console.log('Parsed images:', images);
+
+    // If we have a primary image path from the database, use it as primary
+    if (primaryImagePath) {
+        const processedPrimaryPath = processImagePath(primaryImagePath);
+        const allImagePaths = Array.from(new Set([
+            processedPrimaryPath,
+            ...images.map(img => processImagePath(img.path))
+        ]));
+        
+        return {
+            primaryImageUrl: processedPrimaryPath,
+            imageUrls: allImagePaths
+        };
+    }
+
+    // Otherwise, fall back to the old logic
+    const defaultImage = { path: DEFAULT_PRIMARY_IMAGE_URL, isPrimary: true };
+    const allImages = images.length > 0 ? images : [defaultImage];
+    const primaryImage = allImages.find((img) => img.isPrimary) || allImages[0];
+
+    const processedPrimaryPath = processImagePath(primaryImage.path);
+    const processedImages = allImages.map(img => processImagePath(img.path));
+
+    return {
+        primaryImageUrl: processedPrimaryPath,
+        imageUrls: processedImages
+    };
+
+    // Convert relative paths to absolute paths if they're not external URLs
+    const toAbsolutePath = (path: string) => {
+        if (path.startsWith('http://') || path.startsWith('https://')) {
+            return path;
+        }
+        // Ensure path starts with a forward slash
+        return path.startsWith('/') ? path : `/${path}`;
+    };
+
+    const processImagePath = (path: string) => {
+        if (path.startsWith('http://') || path.startsWith('https://')) {
+            return path;
+        }
+        // For local files, ensure they start with /uploads/
+        if (!path.startsWith('/uploads/')) {
+            path = '/uploads/' + path.replace(/^\//, '');
+        }
+        return path;
+    };
+
+    return {
+        primaryImageUrl: processImagePath(primaryImage.path),
+        imageUrls: allImages.map(img => processImagePath(img.path))
+    };
+}
+
+// Type for updating product images
+export type UpdateProductImageData = {
+    imageFiles?: File[] | null;
+    newPrimaryImageIndexForUpload?: number;
+    makeExistingImagePrimary?: string;
+};
+
+// Type for adding new products
+export type AddProductData = {
+    name: string;
+    category: string;
+    subCategory: string;
+    description: string;
+    price: number;
+    stockQuantity: number;
+    isBestSeller?: boolean;
+    imageFiles?: File[];
+    primaryImageIndex?: number;
+};
+
+// Type for updating products
+export type UpdateProductData = {
+    name: string;
+    category: string;
+    subCategory?: string;
+    description: string;
+    price: number;
+    stockQuantity: number;
+    isBestSeller: boolean;
+    imageUpdateData?: UpdateProductImageData;
+};
+
+// Type for today's sales summary
+export type TodaysSalesSummary = {
+    ordersToday: number;
+    salesTodayAmount: number;
+};
+
+// Type for product sales summary (for analytics)
+export type ProductSaleSummary = {
+    productId: string;
+    productName: string;
+    totalQuantitySold: number;
+};
+
+// Type for top sales by quantity in a single order
+export type TopSaleByQuantity = {
+    id: string;
+    productName: string;
+    quantitySold: number;
+    saleDate: string;
+};
+
+// Type for product revenue summary (for analytics)
+export type ProductRevenueSummary = {
+    productId: string;
+    productName: string;
+    totalRevenue: number;
+};
+
+export async function getProducts(): Promise<Product[]> {
+    const connection = await pool.getConnection();
+    try {
+        const [rows] = await connection.query(`
+            SELECT p.*,
+                GROUP_CONCAT(
+                    CONCAT('{"path":"', pi.image_path, '","isPrimary":', IF(pi.is_primary, 'true', 'false'), '}')
+                    ORDER BY pi.is_primary DESC, pi.created_at ASC
+                ) as images
+            FROM products p
+            LEFT JOIN product_images pi ON p.id = pi.product_id
+            GROUP BY p.id
+            ORDER BY p.created_at DESC
+        `) as [any[], any];
+
+        return rows.map(row => {
+            const { primaryImageUrl, imageUrls } = getImageData(row.images);
+            
+            return {
+                id: row.id,
+                name: row.name,
+                category: row.category,
+                subCategory: row.subcategory || '',
+                description: row.description,
+                price: Number(row.price),
+                stockQuantity: Number(row.stock_quantity) || 0,
+                isBestSeller: Boolean(row.is_best_seller),
+                primaryImageUrl,
+                imageUrls,
+                createdAt: row.created_at ? row.created_at.toISOString() : null,
+                updatedAt: row.updated_at ? row.updated_at.toISOString() : null
+            };
+        });
+    } catch (error) {
+        console.warn("Warning during fetching products:", error);
+        return [];
+    } finally {
+        connection.release();
+    }
+}
+
+export async function getBestSellingProducts(): Promise<Product[]> {
+    const connection = await pool.getConnection();
+    try {
+        const [rows] = await connection.query(`
+            SELECT p.*, 
+                JSON_ARRAYAGG(
+                    JSON_OBJECT(
+                        'path', pi.image_path,
+                        'isPrimary', pi.is_primary
+                    )
+                ) as images
+            FROM products p
+            LEFT JOIN product_images pi ON p.id = pi.product_id
+            WHERE p.is_best_seller = true
+            GROUP BY p.id
+            ORDER BY p.created_at DESC
+        `) as [any[], any];
+
+        return rows.map(row => {
+            type ImageInfo = { path: string; isPrimary: boolean };
+            const images: ImageInfo[] = row.images 
+                ? row.images.split(',')
+                    .map((img: string) => {
+                        try {
+                            return JSON.parse(img) as ImageInfo;
+                        } catch {
+                            return null;
+                        }
+                    })
+                    .filter((img: ImageInfo | null): img is ImageInfo => img !== null && typeof img.path === 'string')
+                : [];
+            
+            const defaultImage = { path: DEFAULT_PRIMARY_IMAGE_URL, isPrimary: true };
+            const allImages = images.length > 0 ? images : [defaultImage];
+            const primaryImage = allImages.find((img) => img.isPrimary) || allImages[0];
+
+            return {
+                id: row.id,
+                name: row.name,
+                category: row.category,
+                subCategory: row.subcategory || '',
+                description: row.description,
+                price: Number(row.price),
+                stockQuantity: Number(row.stock_quantity) || 0,
+                isBestSeller: true,
+                primaryImageUrl: primaryImage.path,
+                imageUrls: allImages.map((img) => img.path),
+                createdAt: row.created_at ? row.created_at.toISOString() : null,
+                updatedAt: row.updated_at ? row.updated_at.toISOString() : null
+            };
+        });
+    } catch (error) {
+        console.warn("Warning during fetching best selling products:", error);
+        return [];
+    } finally {
+        connection.release();
+    }
+}
+
+export async function getMostRecentProduct(): Promise<Product | null> {
+    const connection = await pool.getConnection();
+    try {
+        const [rows] = await connection.query(`
+            SELECT 
+                p.*,
+                p.primary_image_path,
+                CONCAT(
+                    '[',
+                    GROUP_CONCAT(
+                        CONCAT('{"path":"', TRIM(pi.image_path), '","isPrimary":', IF(pi.is_primary, 'true', 'false'), '}')
+                        ORDER BY pi.is_primary DESC, pi.created_at ASC
+                        SEPARATOR ','
+                    ),
+                    ']'
+                ) as images
+            FROM products p
+            LEFT JOIN product_images pi ON p.id = pi.product_id
+            GROUP BY p.id
+            ORDER BY p.created_at DESC
+            LIMIT 1
+        `) as [any[], any];
+
+        if (!rows.length) return null;
+
+        const row = rows[0];
+        const { primaryImageUrl, imageUrls } = getImageData(row.images);
+        
+        return {
+            id: row.id,
+            name: row.name,
+            category: row.category,
+            subCategory: row.subcategory || '',
+            description: row.description,
+            price: Number(row.price),
+            stockQuantity: Number(row.stock_quantity) || 0,
+            isBestSeller: Boolean(row.is_best_seller),
+            primaryImageUrl,
+            imageUrls,
+            createdAt: row.created_at.toISOString(),
+            updatedAt: row.updated_at.toISOString()
+        };
+    } catch (error) {
+        console.warn("Warning during fetching most recent product:", error);
+        return null;
+    } finally {
+        connection.release();
+    }
+}
+
+export async function getProductById(productId: string): Promise<Product | null> {
+    const connection = await pool.getConnection();
+    try {
+        const [rows] = await connection.query(`
+            SELECT 
+                p.*,
+                p.primary_image_path as primary_image_path,
+                CONCAT(
+                    '[',
+                    GROUP_CONCAT(
+                        CONCAT('{"path":"', pi.image_path, '","isPrimary":', IF(pi.is_primary, 'true', 'false'), '}')
+                        ORDER BY pi.is_primary DESC, pi.created_at ASC
+                        SEPARATOR ','
+                    ),
+                    ']'
+                ) as images
+            FROM products p
+            LEFT JOIN product_images pi ON p.id = pi.product_id
+            WHERE p.id = ?
+            GROUP BY p.id
+        `, [productId]) as [any[], any];
+
+        if (!rows.length) return null;
+
+        const row = rows[0];
+        console.log('Raw database row:', JSON.stringify(row, null, 2));
+        console.log('Raw images string:', row.images);
+        console.log('Primary image path from DB:', row.primary_image_path);
+
+        // Process image data
+        const { primaryImageUrl, imageUrls } = row.primary_image_path 
+            ? { 
+                primaryImageUrl: `/uploads/${row.primary_image_path.replace(/^\/uploads\//, '')}`,
+                imageUrls: row.images ? JSON.parse(row.images).map((img: ImageInfo) => 
+                    `/uploads/${img.path.replace(/^\/uploads\//, '')}`) : []
+              }
+            : { 
+                primaryImageUrl: DEFAULT_PRIMARY_IMAGE_URL,
+                imageUrls: [DEFAULT_PRIMARY_IMAGE_URL]
+              };
+
+        console.log('Processed images:', { primaryImageUrl, imageUrls });
+        
+        return {
+            id: row.id,
+            name: row.name,
+            category: row.category,
+            subCategory: row.subcategory || '',
+            description: row.description,
+            price: Number(row.price),
+            stockQuantity: Number(row.stock_quantity) || 0,
+            isBestSeller: Boolean(row.is_best_seller),
+            primaryImageUrl,
+            imageUrls,
+            createdAt: row.created_at ? row.created_at.toISOString() : null,
+            updatedAt: row.updated_at ? row.updated_at.toISOString() : null
+        };
+    } catch (error) {
+        console.warn(`Warning during fetching product ${productId}:`, error);
+        return null;
+    } finally {
+        connection.release();
+    }
+}
+
+export async function addProduct(productData: AddProductData): Promise<{ success: boolean; productId?: string; error?: string }> {
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+        
+        const productId = uuidv4();
+        
+        await connection.query(`
+            INSERT INTO products (
+                id, name, category, subcategory, description, 
+                price, stock_quantity, is_best_seller, primary_image_path,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        `, [
+            productId,
+            productData.name,
+            productData.category,
+            productData.subCategory || '',
+            productData.description,
+            productData.price,
+            productData.stockQuantity,
+            Boolean(productData.isBestSeller),
+            null // Will be updated after image upload
+        ]);
+
+        // Handle image uploads if provided
+        if (productData.imageFiles?.length) {
+            let primaryImagePath = null;
+            
+            for (let i = 0; i < productData.imageFiles.length; i++) {
+                const file = productData.imageFiles[i];
+                const uploadResult = await saveFile('products', file);
+                
+                if (!uploadResult.success || !uploadResult.path) {
+                    throw new Error(`Failed to upload image ${file.name}: ${uploadResult.error}`);
+                }
+                
+                const isPrimary = i === (productData.primaryImageIndex || 0);
+                if (isPrimary || i === 0) { // First image is primary if none specified
+                    primaryImagePath = uploadResult.path;
+                }
+                
+                const imageId = uuidv4();
+                // Store path without /uploads/ prefix as we'll add it when retrieving
+                const imagePath = uploadResult.path.replace(/^\/uploads\//, '');
+                await connection.query(`
+                    INSERT INTO product_images (
+                        id, product_id, image_path, is_primary, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, NOW(), NOW())
+                `, [
+                    imageId,
+                    productId,
+                    imagePath,
+                    isPrimary || i === 0 // First image is primary if none specified
+                ]);
+            }
+            
+            // Update the primary image path in products table
+            if (primaryImagePath) {
+                await connection.query(
+                    'UPDATE products SET primary_image_path = ? WHERE id = ?',
+                    [primaryImagePath, productId]
+                );
+            }
+        }
+
+        await connection.commit();
+        return { success: true, productId };
+    } catch (error) {
+        await connection.rollback();
+        console.error('Error in addProduct:', error);
+        return { 
+            success: false, 
+            error: error instanceof Error ? error.message : 'Failed to create product' 
+        };
+    } finally {
+        connection.release();
+    }
+}
+
+export async function updateProduct(productId: string, productData: Partial<UpdateProductData>): Promise<{ success: boolean; error?: string }> {
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        // If only isBestSeller is being updated, use a simpler query
+        if (Object.keys(productData).length === 1 && 'isBestSeller' in productData) {
+            await connection.query(
+                'UPDATE products SET is_best_seller = ?, updated_at = NOW() WHERE id = ?',
+                [Boolean(productData.isBestSeller), productId]
+            );
+            await connection.commit();
+            return { success: true };
+        }
+
+        // Get current product data for any missing fields
+        const [rows] = await connection.query('SELECT * FROM products WHERE id = ?', [productId]) as [any[], any];
+        if (rows.length === 0) {
+            throw new Error('Product not found');
+        }
+        const current = rows[0];
+
+        // Update product with merged data
+        await connection.query(
+            'UPDATE products SET name = ?, category = ?, subcategory = ?, description = ?, price = ?, stock_quantity = ?, is_best_seller = ?, updated_at = NOW() WHERE id = ?',
+            [
+                productData.name ?? current.name,
+                productData.category ?? current.category,
+                productData.subCategory ?? current.subcategory ?? '',
+                productData.description ?? current.description,
+                productData.price ?? current.price,
+                productData.stockQuantity ?? current.stock_quantity,
+                productData.isBestSeller !== undefined ? Boolean(productData.isBestSeller) : Boolean(current.is_best_seller),
+                productId
+            ]
+        );
+
+        // Handle image updates if provided
+        if (productData.imageUpdateData) {
+            const { imageFiles, makeExistingImagePrimary, newPrimaryImageIndexForUpload } = productData.imageUpdateData;
+
+            // If making an existing image primary
+            if (makeExistingImagePrimary) {
+                await connection.query(
+                    'UPDATE product_images SET is_primary = CASE WHEN image_path = ? THEN true ELSE false END, updated_at = NOW() WHERE product_id = ?',
+                    [makeExistingImagePrimary, productId]
+                );
+            }
+
+            // If new images are being uploaded
+            if (Array.isArray(imageFiles) && imageFiles.length > 0) {
+                // Delete all existing images first
+                await connection.query('DELETE FROM product_images WHERE product_id = ?', [productId]);
+
+                // Upload and save new images
+                let primaryImagePath = null;
+                
+                for (let i = 0; i < imageFiles.length; i++) {
+                    const file = imageFiles[i];
+                    if (file instanceof File) {
+                        const uploadResult = await saveFile('products', file);
+                        if (uploadResult.success && uploadResult.path) {
+                            const isPrimary = i === (newPrimaryImageIndexForUpload || 0) && !makeExistingImagePrimary;
+                            if (isPrimary || i === 0) { // First image is primary if none specified
+                                primaryImagePath = uploadResult.path;
+                            }
+                            
+                            const imageId = uuidv4();
+                            await connection.query(
+                                'INSERT INTO product_images (id, product_id, image_path, is_primary, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())',
+                                [
+                                    imageId,
+                                    productId,
+                                    uploadResult.path,
+                                    isPrimary || (i === 0 && !makeExistingImagePrimary) // First image is primary if none specified and not making existing primary
+                                ]
+                            );
+                        }
+                    }
+                }
+                
+                // Update the primary image path in products table
+                if (primaryImagePath) {
+                    await connection.query(
+                        'UPDATE products SET primary_image_path = ? WHERE id = ?',
+                        [primaryImagePath, productId]
+                    );
+                }
+            }
+        }
+
+        await connection.commit();
+        return { success: true };
+    } catch (error) {
+        await connection.rollback();
+        console.error('Error in updateProduct:', error);
+        return { 
+            success: false, 
+            error: error instanceof Error ? error.message : 'Failed to update product' 
+        };
+    } finally {
+        connection.release();
+    }
+}
+
+export async function deleteProduct(productId: string): Promise<{ success: boolean; error?: string }> {
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        // Get all image paths first
+        const [imageRows] = await connection.query<any[]>(
+            'SELECT image_path FROM product_images WHERE product_id = ?',
+            [productId]
+        );
+
+        // Delete files from the filesystem
+        for (const row of imageRows) {
+            try {
+                await deleteFile(row.image_path);
+            } catch (error) {
+                console.error(`Failed to delete file ${row.image_path}:`, error);
+                // Continue with deletion even if file removal fails
+            }
+        }
+
+        // Delete product images from database (due to foreign key constraint)
+        await connection.query('DELETE FROM product_images WHERE product_id = ?', [productId]);
+
+        // Delete the product
+        await connection.query('DELETE FROM products WHERE id = ?', [productId]);
+
+        await connection.commit();
+        return { success: true };
+    } catch (error) {
+        await connection.rollback();
+        console.error('Error in deleteProduct:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to delete product'
+        };
+    } finally {
+        connection.release();
+    }
+}
+
+export async function updateProductBestSellerStatus(productId: string, isBestSeller: boolean): Promise<{ success: boolean; error?: string }> {
+    const connection = await pool.getConnection();
+    try {
+        await connection.query(
+            'UPDATE products SET is_best_seller = ?, updated_at = NOW() WHERE id = ?',
+            [isBestSeller, productId]
+        );
+        return { success: true };
+    } catch (error) {
+        console.error('Error in updateProductBestSellerStatus:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to update best seller status'
+        };
+    } finally {
+        connection.release();
+    }
+}
+
+export async function getTodaysSalesSummary(): Promise<TodaysSalesSummary> {
+    const [rows] = await executeQuery<any[]>(`
+        SELECT COUNT(*) as ordersToday, 
+               SUM(quantity_sold * price) as salesTodayAmount
+        FROM product_sales
+        WHERE DATE(sale_date) = CURDATE()
+    `);
+
+    const row = rows[0];
+    return {
+        ordersToday: row.ordersToday || 0,
+        salesTodayAmount: Number(row.salesTodayAmount) || 0
+    };
+}
+
+export async function getProductSalesSummary(
+    limit: number = 10,
+    startDate?: Date,
+    endDate?: Date
+): Promise<ProductSaleSummary[]> {
+    const dateFilter = startDate && endDate
+        ? 'WHERE sale_date BETWEEN ? AND ?'
+        : '';
+
+    const params: (Date | number)[] = startDate && endDate ? [startDate, endDate] : [];
+    if (limit) params.push(limit);
+
+    const rows = await executeQuery<any[]>(`
+        SELECT p.id as productId, p.name as productName,
+               SUM(ps.quantity_sold) as totalQuantitySold
+        FROM products p
+        LEFT JOIN product_sales ps ON p.id = ps.product_id
+        ${dateFilter}
+        GROUP BY p.id, p.name
+        ORDER BY totalQuantitySold DESC
+        LIMIT ?
+    `, params);
+
+    return rows.map(row => ({
+        productId: row.productId,
+        productName: row.productName,
+        totalQuantitySold: Number(row.totalQuantitySold) || 0
+    }));
+}
+
+export async function getTopSalesByQuantity(
+    limit: number = 10,
+    startDate?: Date,
+    endDate?: Date
+): Promise<TopSaleByQuantity[]> {
+    const dateFilter = startDate && endDate
+        ? 'WHERE sale_date BETWEEN ? AND ?'
+        : '';
+
+    const params: (Date | number)[] = startDate && endDate ? [startDate, endDate] : [];
+    if (limit) params.push(limit);
+
+    const rows = await executeQuery<any[]>(`
+        SELECT ps.id, p.name as productName, ps.quantity_sold as quantitySold,
+               ps.sale_date as saleDate
+        FROM product_sales ps
+        JOIN products p ON ps.product_id = p.id
+        ${dateFilter}
+        ORDER BY ps.quantity_sold DESC
+        LIMIT ?
+    `, params);
+
+    return rows.map(row => ({
+        id: row.id,
+        productName: row.productName,
+        quantitySold: Number(row.quantitySold),
+        saleDate: row.saleDate.toISOString()
+    }));
+}
+
+export async function getProductRevenueSummary(
+    limit: number = 10,
+    startDate?: Date,
+    endDate?: Date
+): Promise<ProductRevenueSummary[]> {
+    const dateFilter = startDate && endDate
+        ? 'WHERE sale_date BETWEEN ? AND ?'
+        : '';
+
+    const params: (Date | number)[] = startDate && endDate ? [startDate, endDate] : [];
+    if (limit) params.push(limit);
+
+    const rows = await executeQuery<any[]>(`
+        SELECT p.id as productId, p.name as productName,
+               SUM(ps.quantity_sold * p.price) as totalRevenue
+        FROM products p
+        LEFT JOIN product_images pi ON p.id = ps.product_id
+        ${dateFilter}
+        GROUP BY p.id, p.name
+        ORDER BY totalRevenue DESC
+        LIMIT ?
+    `, params);
+
+    return rows.map(row => ({
+        productId: row.productId,
+        productName: row.productName,
+        totalRevenue: Number(row.totalRevenue) || 0
+    }));
+}

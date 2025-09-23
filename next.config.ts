@@ -5,43 +5,39 @@ const nextConfig: NextConfig = {
   /* config options here */
   typescript: {
     ignoreBuildErrors: true,
+    tsconfigPath: "tsconfig.json"
   },
   eslint: {
     ignoreDuringBuilds: true,
   },
+  experimental: {
+    typedRoutes: false
+  },
   images: {
+    domains: ['localhost', 'beyoushop.in', 'placehold.co'],
     remotePatterns: [
       {
-        protocol: 'https',
-        hostname: 'picsum.photos',
-        port: '',
-        pathname: '/**',
-      },
-      { // Add Firebase Storage domain for bucket name
-        protocol: 'https',
-        hostname: 'elegance-boutique-m9ypf.firebasestorage.app',
-        port: '',
-        pathname: '/**',
-      },
-      { // Add Firebase Storage domain for direct file access
-        protocol: 'https',
-        hostname: 'firebasestorage.googleapis.com',
-        port: '',
-        pathname: '/**',
-      },
-      { // Add placehold.co for placeholder images
         protocol: 'https',
         hostname: 'placehold.co',
         port: '',
         pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'beyoushop.in',
+        port: '',
+        pathname: '/**',
       }
     ],
+    unoptimized: true, // This will serve original images without optimization
   },
-  // Add allowedDevOrigins for IDX development environment
-  experimental: {
-    allowedDevOrigins: [
-        "*.cluster-zkm2jrwbnbd4awuedc2alqxrpk.cloudworkstations.dev"
-    ],
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: '/api/:path*',
+      },
+    ];
   },
 };
 

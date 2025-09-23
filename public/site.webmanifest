@@ -4,19 +4,19 @@
   "description": "Your one-stop shop for affordable kawaii cosmetics, press-on nails, and aesthetic custom prints.",
   "icons": [
     {
-      "src": "/BeYou.png",
+      "src": "/icons/BeYou.png",
       "sizes": "any",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/BeYou.png",
+      "src": "/icons/BeYou.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "/BeYou.png",
+      "src": "/icons/BeYou.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

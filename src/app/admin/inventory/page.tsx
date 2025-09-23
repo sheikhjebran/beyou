@@ -2,7 +2,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { PlusCircle, Edit, Trash2, PackageSearch, AlertCircle, Loader2, Star } from 'lucide-react';
-import Image from 'next/image';
+import { LoadingImage } from '@/components/loading-image';
 import Link from 'next/link';
 import { getProducts, deleteProduct as deleteProductService, updateProductBestSellerStatus } from '@/services/productService';
 import type { Product } from '@/types/product';
@@ -34,34 +34,56 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import useSWR from 'swr';
+import { Pagination, PaginationInfo } from '@/components/ui/pagination';
+
+interface PaginatedProductsResponse {
+  products: Product[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+const fetcher = async (url: string): Promise<PaginatedProductsResponse> => {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error('Failed to fetch products');
+    }
+    const data = await res.json();
+    if (!data) {
+      return { products: [], total: 0, page: 1, pageSize: 10, totalPages: 0 };
+    }
+    return data;
+  } catch (error) {
+    // Convert any error to a string message
+    throw new Error(error instanceof Error ? error.message : 'Failed to load products');
+  }
+};
 
 export default function InventoryPage() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const { data, error, isLoading, mutate } = useSWR<PaginatedProductsResponse>(`/api/products?page=${page}&pageSize=${pageSize}`, fetcher);
+  
+  // Extract data from response
+  const products = data?.products || [];
+  const total = data?.total || 0;
+  const totalPages = data?.totalPages || 0;
+  
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
   const [togglingProductId, setTogglingProductId] = useState<string | null>(null);
   const { toast } = useToast();
   const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
 
-  async function loadProducts() {
-    setLoading(true);
-    setError(null);
-    try {
-      const fetchedProducts = await getProducts();
-      setProducts(fetchedProducts);
-    } catch (err) {
-       console.warn("Failed to load products:", err);
-       setError(err instanceof Error ? err.message : "An unknown error occurred while fetching products.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    loadProducts();
-  }, []);
+  // Reset to page 1 when pageSize changes
+  const handlePageSizeChange = (newPageSize: string) => {
+    setPageSize(parseInt(newPageSize));
+    setPage(1);
+  };
 
   const openDeleteDialog = (product: Product) => {
     setProductToDelete(product);
@@ -69,31 +91,41 @@ export default function InventoryPage() {
   };
 
   const handleBestSellerToggle = async (product: Product) => {
-    const newStatus = !product.isBestSeller;
+    const newStatus = !product.is_best_seller;
     setTogglingProductId(product.id);
+    
+    // Optimistically update the UI first
+    const previousData = data;
+    if (data) {
+      await mutate(
+        {
+          ...data,
+          products: data.products.map((p: Product) =>
+            p.id === product.id ? { ...p, is_best_seller: newStatus } : p
+          )
+        },
+        false
+      );
+    }
+
     try {
       await updateProductBestSellerStatus(product.id, newStatus);
-      setProducts(prevProducts =>
-        prevProducts.map(p =>
-          p.id === product.id ? { ...p, isBestSeller: newStatus } : p
-        )
-      );
       toast({
         title: "Status Updated",
         description: `"${product.name}" is ${newStatus ? 'now' : 'no longer'} a best seller.`,
       });
     } catch (err) {
+      // Revert to previous state on error
+      if (previousData) {
+        await mutate(previousData, false);
+      }
       toast({
         variant: "destructive",
         title: "Update Failed",
         description: err instanceof Error ? err.message : "Could not update best seller status.",
       });
-      // Revert UI on failure
-      setProducts(prevProducts =>
-        prevProducts.map(p =>
-          p.id === product.id ? { ...p, isBestSeller: product.isBestSeller } : p
-        )
-      );
+      // Revert UI on failure by refetching
+      await mutate();
     } finally {
       setTogglingProductId(null);
     }
@@ -108,7 +140,18 @@ export default function InventoryPage() {
 
     try {
       await deleteProductService(productToDelete.id);
-      setProducts(prevProducts => prevProducts.filter(p => p.id !== productToDelete.id));
+      // Optimistically update UI
+      if (data) {
+        await mutate(
+          {
+            ...data,
+            products: data.products.filter((p: Product) => p.id !== productToDelete.id),
+            total: data.total - 1,
+            totalPages: Math.ceil((data.total - 1) / pageSize)
+          },
+          false
+        );
+      }
       toast({
         title: "Product Deleted",
         description: `Product "${productToDelete.name}" has been successfully deleted.`,
@@ -120,6 +163,8 @@ export default function InventoryPage() {
         title: "Error Deleting Product",
         description: err instanceof Error ? err.message : "An unexpected error occurred.",
       });
+      // Revert UI on failure by refetching
+      await mutate();
     } finally {
       setDeletingProductId(null);
       setProductToDelete(null);
@@ -128,9 +173,16 @@ export default function InventoryPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl md:text-3xl font-bold">Inventory Management</h1>
-         <Link href="/admin/inventory/add" passHref legacyBehavior>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold">Inventory Management</h1>
+          {!isLoading && !error && (
+            <p className="text-muted-foreground mt-1">
+              Managing {total} product{total !== 1 ? 's' : ''} across {totalPages} page{totalPages !== 1 ? 's' : ''}
+            </p>
+          )}
+        </div>
+         <Link href="/admin/inventory/add" className="block">
              <Button>
                  <PlusCircle className="mr-2 h-4 w-4" /> Add Product
              </Button>
@@ -139,20 +191,54 @@ export default function InventoryPage() {
 
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Product List</CardTitle>
-          <CardDescription>View, add, edit, or delete your products. Use the toggle to mark items as best sellers.</CardDescription>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <CardTitle>Product List</CardTitle>
+              <CardDescription>View, add, edit, or delete your products. Use the toggle to mark items as best sellers.</CardDescription>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Label htmlFor="pageSize" className="text-sm font-medium">
+                Show:
+              </Label>
+              <Select value={pageSize.toString()} onValueChange={handlePageSizeChange}>
+                <SelectTrigger className="w-20" id="pageSize">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="5">5</SelectItem>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-sm text-muted-foreground">per page</span>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
-           {error && (
+           {error ? (
               <Alert variant="destructive" className="mb-4">
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle>Error Loading Products</AlertTitle>
-                <AlertDescription>{error}</AlertDescription>
+                <AlertDescription>{error.message}</AlertDescription>
               </Alert>
-           )}
-          <Table>
-            <TableCaption>A list of your products.</TableCaption>
-            <TableHeader>
+           ) : products.length === 0 && !isLoading ? (
+              <Alert className="mb-4">
+                <PackageSearch className="h-4 w-4" />
+                <AlertTitle>No Products Found</AlertTitle>
+                <AlertDescription>
+                  There are no products in your inventory. Click the "Add Product" button to add your first product.
+                </AlertDescription>
+              </Alert>
+           ) : null}
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          ) : products.length === 0 ? null : (
+            <Table>
+              <TableCaption>A list of your products.</TableCaption>
+              <TableHeader>
               <TableRow>
                 <TableHead className="w-[80px]">Image</TableHead>
                 <TableHead>Name</TableHead>
@@ -165,7 +251,7 @@ export default function InventoryPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading ? (
+              {isLoading ? (
                   Array.from({ length: 5 }).map((_, index) => (
                      <TableRow key={`skeleton-${index}`}>
                        <TableCell><Skeleton className="h-16 w-16 rounded-md" /></TableCell>
@@ -190,8 +276,8 @@ export default function InventoryPage() {
                   <TableRow key={product.id}>
                     <TableCell>
                       <div className="relative w-16 h-16">
-                        <Image
-                          src={product.primaryImageUrl || 'https://placehold.co/64x64.png'}
+                        <LoadingImage
+                          src={product.primary_image_path || '/images/placeholder.png'}
                           alt={product.name}
                           fill // Use fill for responsive fixed size containers
                           sizes="64px" // Provide an accurate size
@@ -202,7 +288,7 @@ export default function InventoryPage() {
                     </TableCell>
                     <TableCell className="font-medium">{product.name}</TableCell>
                     <TableCell>{product.category}</TableCell>
-                    <TableCell>{product.subCategory}</TableCell>
+                    <TableCell>{product.subcategory}</TableCell>
                     <TableCell>
                         <div className="flex items-center space-x-2">
                            {togglingProductId === product.id ? (
@@ -210,7 +296,7 @@ export default function InventoryPage() {
                            ) : (
                                 <Switch
                                     id={`bestseller-${product.id}`}
-                                    checked={product.isBestSeller}
+                                    checked={product.is_best_seller}
                                     onCheckedChange={() => handleBestSellerToggle(product)}
                                     aria-label={`Mark ${product.name} as best seller`}
                                     disabled={togglingProductId === product.id}
@@ -222,10 +308,10 @@ export default function InventoryPage() {
                         </div>
                     </TableCell>
                     <TableCell className="text-right">₹{product.price.toFixed(2)}</TableCell>
-                    <TableCell className="text-right">{product.quantity ?? 'N/A'}</TableCell>
+                    <TableCell className="text-right">{product.stock_quantity ?? 'N/A'}</TableCell>
                     <TableCell className="text-center">
                       <div className="flex justify-center gap-2">
-                        <Link href={`/admin/inventory/edit/${product.id}`} passHref legacyBehavior>
+                        <Link href={`/admin/inventory/edit/${product.id}`} className="inline-block">
                            <Button variant="outline" size="icon" className="h-8 w-8">
                               <Edit className="h-4 w-4" />
                               <span className="sr-only">Edit</span>
@@ -252,6 +338,25 @@ export default function InventoryPage() {
               )}
             </TableBody>
           </Table>
+          )}
+          
+          {/* Pagination Controls */}
+          {!error && !isLoading && totalPages > 1 && (
+            <div className="mt-6 space-y-4">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <PaginationInfo
+                  currentPage={page}
+                  pageSize={pageSize}
+                  totalItems={total}
+                />
+                <Pagination
+                  currentPage={page}
+                  totalPages={totalPages}
+                  onPageChange={setPage}
+                />
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

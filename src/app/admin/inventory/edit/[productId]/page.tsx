@@ -1,10 +1,8 @@
-
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { useForm, SubmitHandler } from 'react-hook-form';
+import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
@@ -12,15 +10,29 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { useToast } from "@/hooks/use-toast";
-import { updateProduct, getProductById, type UpdateProductData } from '@/services/productService';
+import { updateProduct, getProductById } from '@/services/productService';
+// import type { UpdateProductData } from '@/services/productService';
+// If you need the type, define it locally or use the correct exported type from productService.
+type UpdateProductData = {
+  name: string;
+  category: string;
+  subCategory?: string;
+  description: string;
+  price: number;
+  stockQuantity: number;
+  isBestSeller?: boolean;
+  imageFiles?: File[] | null;
+  newPrimaryImageIndexForUpload?: number;
+  makeExistingImagePrimary?: string;
+};
 import { Loader2, ArrowLeft, AlertCircle, UploadCloud, XCircle, Star } from 'lucide-react';
 import Link from 'next/link';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Product } from '@/types/product';
-import Image from 'next/image';
+import { LoadingImage } from '@/components/loading-image';
 import { getMainCategories, getSubCategories, type Category } from '@/lib/categories';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
@@ -31,13 +43,27 @@ const MAX_FILE_SIZE_MB = 5;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
+// Local interface that matches what the server expects
+interface UpdateProductPayload {
+  name?: string;
+  description?: string;
+  price?: number;
+  stock_quantity?: number; // Server expects this field name
+  category?: string;
+  subcategory?: string; // Server expects this field name (not sub_category)
+  is_best_seller?: boolean; // Server expects this field name
+  imageFiles?: File[] | null;
+  newPrimaryImageIndexForUpload?: number;
+  makeExistingImagePrimary?: string;
+}
+
 const productFormSchema = z.object({
   name: z.string().min(3, { message: "Product name must be at least 3 characters." }),
   category: z.string().min(1, { message: "Please select a category." }),
   subCategory: z.string().optional(),
   description: z.string().min(10, { message: "Description must be at least 10 characters." }),
   price: z.coerce.number().min(0.01, { message: "Price must be a positive number." }),
-  quantity: z.coerce.number().int().min(0, { message: "Quantity must be a non-negative integer." }),
+  stockQuantity: z.coerce.number().int().min(0, { message: "Quantity must be a non-negative integer." }),
   isBestSeller: z.boolean().default(false),
   imageFiles: z.array(z.instanceof(File))
     .max(MAX_FILES, `You can upload a maximum of ${MAX_FILES} images.`)
@@ -94,7 +120,7 @@ export default function EditProductPage() {
       subCategory: '',
       description: '',
       price: undefined,
-      quantity: undefined,
+      stockQuantity: undefined,
       isBestSeller: false,
       imageFiles: null,
     },
@@ -141,21 +167,35 @@ export default function EditProductPage() {
            form.reset({
              name: currentProduct.name,
              category: currentProduct.category,
-             subCategory: currentProduct.subCategory,
-             description: currentProduct.description,
+             subCategory: currentProduct.subcategory ?? '',
+             description: currentProduct.description ?? '',
              price: currentProduct.price,
-             quantity: currentProduct.quantity,
-             isBestSeller: currentProduct.isBestSeller || false,
+             stockQuantity: currentProduct.stock_quantity,
+             isBestSeller: currentProduct.is_best_seller,
              imageFiles: null, // Reset file input
            });
+            // Process image URLs to ensure they're absolute
+            const processImageUrl = (url: string) => {
+                if (!url) return null;
+                if (url.startsWith('http://') || url.startsWith('https://')) {
+                    return url;
+                }
+                // Ensure the URL starts with a forward slash
+                return url.startsWith('/') ? url : `/${url}`;
+            };
+
             // Order existing images: primary first, then others
             const orderedExistingImages = [
-                currentProduct.primaryImageUrl, 
-                ...currentProduct.imageUrls.filter(url => url !== currentProduct.primaryImageUrl)
-            ].filter(Boolean) as string[]; // Filter out null/undefined if primary is default
+                ...(currentProduct.primary_image_path ? [processImageUrl(currentProduct.primary_image_path)] : []), 
+                ...(currentProduct.image_paths || [])
+                    .filter(url => url !== currentProduct.primary_image_path)
+                    .map(processImageUrl)
+            ].filter(Boolean) as string[]; // Filter out null/undefined
 
+            console.log('Ordered images:', orderedExistingImages);
             setCurrentImagePreviews(orderedExistingImages);
-            setPrimaryImageMarker(currentProduct.primaryImageUrl || (orderedExistingImages.length > 0 ? orderedExistingImages[0] : null) );
+            const primaryUrl = currentProduct.primary_image_path ? processImageUrl(currentProduct.primary_image_path) : null;
+            setPrimaryImageMarker(primaryUrl || (orderedExistingImages.length > 0 ? orderedExistingImages[0] : null));
             setNewImagePreviews([]); // Clear any new previews from previous states
 
              if (currentProduct.category) {
@@ -193,7 +233,7 @@ export default function EditProductPage() {
             setNewImagePreviews([...newPreviews]);
             setPrimaryImageMarker(0); // New files uploaded, primary is the first of these by index
             setCurrentImagePreviews([]); // Hide current images as new ones are being staged
-            form.markFieldAsDirty('imageFiles');
+            form.setValue('imageFiles', form.getValues('imageFiles'), { shouldDirty: true });
           }
         };
         reader.readAsDataURL(file);
@@ -203,11 +243,11 @@ export default function EditProductPage() {
       setNewImagePreviews([]);
       // Restore current images and primary marker
       if (productData) {
-        const orderedInitialImages = [productData.primaryImageUrl, ...productData.imageUrls.filter(url => url !== productData.primaryImageUrl)].filter(Boolean) as string[];
+        const orderedInitialImages = [productData.primary_image_path, ...(productData.image_paths || []).filter((url: string) => url !== productData.primary_image_path)].filter(Boolean) as string[];
         setCurrentImagePreviews(orderedInitialImages);
-        setPrimaryImageMarker(productData.primaryImageUrl || (orderedInitialImages.length > 0 ? orderedInitialImages[0] : null));
+        setPrimaryImageMarker(productData.primary_image_path);
       }
-      form.markFieldAsDirty('imageFiles'); // Mark as dirty to allow saving "no images"
+      form.setValue('imageFiles', [], { shouldDirty: true }); // Mark as dirty to allow saving "no images"
     }
   };
 
@@ -221,9 +261,9 @@ export default function EditProductPage() {
 
     if (updatedFiles.length === 0) { // All new previews removed, revert to current images
         if (productData) {
-            const orderedInitialImages = [productData.primaryImageUrl, ...productData.imageUrls.filter(url => url !== productData.primaryImageUrl)].filter(Boolean) as string[];
+            const orderedInitialImages = [productData.primary_image_path, ...(productData.image_paths || []).filter((url: string) => url !== productData.primary_image_path)].filter(Boolean) as string[];
             setCurrentImagePreviews(orderedInitialImages);
-            setPrimaryImageMarker(productData.primaryImageUrl || (orderedInitialImages.length > 0 ? orderedInitialImages[0] : null));
+            setPrimaryImageMarker(productData.primary_image_path);
         }
     } else {
         // Adjust primaryImageMarker if it was an index for new files
@@ -235,19 +275,80 @@ export default function EditProductPage() {
             }
         }
     }
-    form.markFieldAsDirty('imageFiles');
+    form.setValue('imageFiles', updatedFiles.length > 0 ? updatedFiles : null, { shouldDirty: true });
   };
   
-  const handleExistingImageClick = (url: string) => {
-    if (newImagePreviews.length === 0) { // Only allow selecting from existing if no new images are staged
-        setPrimaryImageMarker(url);
-        form.markFieldAsDirty('name'); // Trick to enable save button if only primary image changed among existing
+  const handleSetPrimary = async (imagePath: string) => {
+    if (!productId || imagePath === primaryImageMarker) return;
+
+    try {
+        const response = await fetch(`/api/products/images?productId=${productId}&imagePath=${encodeURIComponent(imagePath)}`, {
+            method: 'PUT'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to set primary image');
+        }
+
+        setPrimaryImageMarker(imagePath);
+        toast({
+            title: "Success",
+            description: "Primary image updated successfully"
+        });
+    } catch (error) {
+        console.error('Error setting primary image:', error);
+        toast({
+            variant: "destructive",
+            title: "Error",
+            description: error instanceof Error ? error.message : "Failed to set primary image"
+        });
+    }
+  };
+
+  const handleDeleteImage = async (imagePath: string) => {
+    if (!productId || imagePath === primaryImageMarker) {
+        toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Cannot delete the primary image. Please set another image as primary first."
+        });
+        return;
+    }
+
+    if (!confirm('Are you sure you want to delete this image?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/products/images?productId=${productId}&imagePath=${encodeURIComponent(imagePath)}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to delete image');
+        }
+
+        // Remove the image from currentImagePreviews
+        setCurrentImagePreviews(prev => prev.filter(url => url !== imagePath));
+        toast({
+            title: "Success",
+            description: "Image deleted successfully"
+        });
+    } catch (error) {
+        console.error('Error deleting image:', error);
+        toast({
+            variant: "destructive",
+            title: "Error",
+            description: error instanceof Error ? error.message : "Failed to delete image"
+        });
     }
   };
 
   const handleNewPreviewClick = (index: number) => {
       setPrimaryImageMarker(index);
-      form.markFieldAsDirty('name'); 
+      form.setValue('name', form.getValues('name'), { shouldDirty: true }); 
   }
 
 
@@ -258,7 +359,7 @@ export default function EditProductPage() {
     }
     setIsSubmitting(true);
 
-    const dataToUpdate: UpdateProductData = {};
+    const dataToUpdate: Partial<UpdateProductData> = {};
     let hasChanges = false;
 
     // Check for changes in standard fields
@@ -277,9 +378,9 @@ export default function EditProductPage() {
         }
     });
 
-     if (values.category && values.category === 'Custom Prints' && (productData.subCategory || values.subCategory)) {
+     if (values.category && values.category === 'Custom Prints' && (productData.subcategory || values.subCategory)) {
         dataToUpdate.subCategory = ''; // Ensure subCategory is cleared for Custom Prints
-        if (productData.subCategory) hasChanges = true; // Only mark as change if it was previously set
+        if (productData.subcategory) hasChanges = true; // Only mark as change if it was previously set
     }
 
 
@@ -296,7 +397,7 @@ export default function EditProductPage() {
     } else if (form.formState.dirtyFields.imageFiles && (!newFiles || newFiles.length === 0) && newImagePreviews.length === 0 && currentImagePreviews.length > 0) {
         dataToUpdate.imageFiles = null; // Signal to delete all images
         hasChanges = true;
-    } else if (typeof primaryImageMarker === 'string' && primaryImageMarker !== productData.primaryImageUrl && currentImagePreviews.includes(primaryImageMarker)) {
+    } else if (typeof primaryImageMarker === 'string' && primaryImageMarker !== productData.primary_image_path && currentImagePreviews.includes(primaryImageMarker)) {
         // No new files uploaded, but an existing image was chosen as primary
         dataToUpdate.makeExistingImagePrimary = primaryImageMarker;
         hasChanges = true;
@@ -312,7 +413,7 @@ export default function EditProductPage() {
      // Final check for subCategory validity
     const finalCategory = dataToUpdate.category || productData.category;
     if (finalCategory && finalCategory !== 'Custom Prints') {
-        const finalSubCategory = dataToUpdate.subCategory === undefined ? productData.subCategory : dataToUpdate.subCategory;
+        const finalSubCategory = dataToUpdate.subCategory === undefined ? productData.subcategory : dataToUpdate.subCategory;
         if (!finalSubCategory || finalSubCategory.length === 0) {
              form.setError("subCategory", {type: "manual", message: "Sub-category is required for this category."});
              setIsSubmitting(false);
@@ -328,7 +429,23 @@ export default function EditProductPage() {
 
 
     try {
-      await updateProduct(productId, dataToUpdate);
+      // Ensure all required fields are present for UpdateProductPayload
+      const updatePayload: UpdateProductPayload = {
+        name: dataToUpdate.name ?? productData.name,
+        category: dataToUpdate.category ?? productData.category,
+        description: dataToUpdate.description ?? productData.description ?? '',
+        price: dataToUpdate.price ?? productData.price,
+        stock_quantity: dataToUpdate.stockQuantity ?? productData.stock_quantity,
+        subcategory: (dataToUpdate.subCategory ?? productData.subcategory) !== undefined
+          ? String(dataToUpdate.subCategory ?? productData.subcategory)
+          : '', // Always a string, never undefined
+        is_best_seller: Boolean(dataToUpdate.isBestSeller ?? productData.is_best_seller ?? false),
+        imageFiles: dataToUpdate.imageFiles ?? null,
+        newPrimaryImageIndexForUpload: dataToUpdate.newPrimaryImageIndexForUpload,
+        makeExistingImagePrimary: dataToUpdate.makeExistingImagePrimary,
+      };
+
+      await updateProduct(productId, updatePayload as any);
       toast({
         title: "Product Updated",
         description: `Product "${values.name || productData.name}" has been successfully updated.`,
@@ -351,7 +468,7 @@ export default function EditProductPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-4">
-        <Link href="/admin/inventory" passHref legacyBehavior>
+        <Link href="/admin/inventory" className="inline-block">
           <Button variant="outline" size="icon" className="h-8 w-8">
             <ArrowLeft className="h-4 w-4" />
             <span className="sr-only">Back to Inventory</span>
@@ -379,7 +496,7 @@ export default function EditProductPage() {
                 <FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel>Description</FormLabel><FormControl><Textarea placeholder="Detailed description of the product..." {...field} /></FormControl><FormMessage /></FormItem>)} />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField control={form.control} name="price" render={({ field }) => (<FormItem><FormLabel>Price (₹)</FormLabel><FormControl><Input type="number" step="0.01" placeholder="e.g., 24.99" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                  <FormField control={form.control} name="quantity" render={({ field }) => (<FormItem><FormLabel>Quantity</FormLabel><FormControl><Input type="number" placeholder="e.g., 100" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                  <FormField control={form.control} name="stockQuantity" render={({ field }) => (<FormItem><FormLabel>Quantity</FormLabel><FormControl><Input type="number" placeholder="e.g., 100" {...field} /></FormControl><FormMessage /></FormItem>)} />
                 </div>
                 
                 <FormField control={form.control} name="isBestSeller" render={({ field }) => (
@@ -408,12 +525,49 @@ export default function EditProductPage() {
                             <div className="mt-2 mb-4">
                                 <p className="text-sm text-muted-foreground mb-1">Current Images (Click to make primary):</p>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                                {currentImagePreviews.map((url, index) => (
-                                    <div key={`current-${index}`} className="relative aspect-square group cursor-pointer" onClick={() => handleExistingImageClick(url)}>
-                                        <Image src={url} alt={`Current image ${index + 1}`} fill className={`object-cover rounded-md border-2 ${url === primaryImageMarker ? 'border-primary ring-2 ring-primary' : 'border-transparent'}`} />
-                                        {url === primaryImageMarker && <Badge variant="secondary" className="absolute top-1 left-1 text-xs z-10">Primary</Badge>}
-                                    </div>
-                                ))}
+                                    {currentImagePreviews.map((url, index) => (
+                                        <div key={`current-${index}`} className="relative aspect-square group">
+                                            <div className="relative w-full h-full">
+                                                <LoadingImage 
+                                                    src={url} 
+                                                    alt={`Current image ${index + 1}`} 
+                                                    fill 
+                                                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                                                    className={`object-cover rounded-md border-2 ${url === primaryImageMarker ? 'border-primary ring-2 ring-primary' : 'border-transparent'}`}
+                                                />
+                                            </div>
+                                            {url === primaryImageMarker ? (
+                                                <Badge variant="secondary" className="absolute top-1 left-1 text-xs z-10">Primary</Badge>
+                                            ) : (
+                                                <div className="absolute top-1 right-1 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <Button
+                                                        type="button"
+                                                        variant="secondary"
+                                                        size="icon"
+                                                        className="h-6 w-6 bg-white hover:bg-white/90"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleSetPrimary(url);
+                                                        }}
+                                                    >
+                                                        <Star className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        type="button"
+                                                        variant="destructive"
+                                                        size="icon"
+                                                        className="h-6 w-6"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleDeleteImage(url);
+                                                        }}
+                                                    >
+                                                        <XCircle className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         )}
@@ -421,15 +575,15 @@ export default function EditProductPage() {
                             <div className="mt-2 mb-4">
                                 <p className="text-sm text-muted-foreground mb-1">New Images Preview (Click to make primary):</p>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                                {newImagePreviews.map((url, index) => (
-                                    <div key={`new-${index}`} className="relative aspect-square group cursor-pointer" onClick={() => handleNewPreviewClick(index)}>
-                                        <Image src={url} alt={`New preview ${index + 1}`} fill className={`object-cover rounded-md border-2 ${index === primaryImageMarker ? 'border-primary ring-2 ring-primary' : 'border-transparent'}`} />
-                                        {index === primaryImageMarker && <Badge variant="default" className="absolute top-1 left-1 text-xs z-10">Primary</Badge>}
-                                        <Button type="button" variant="destructive" size="icon" className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity z-20" onClick={(e) => {e.stopPropagation(); removeNewPreviewImage(index)}}>
-                                            <XCircle className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                ))}
+                                    {newImagePreviews.map((url, index) => (
+                                        <div key={`new-${index}`} className="relative aspect-square group cursor-pointer" onClick={() => handleNewPreviewClick(index)}>
+                                            <LoadingImage src={url} alt={`New preview ${index + 1}`} fill className={`object-cover rounded-md border-2 ${index === primaryImageMarker ? 'border-primary ring-2 ring-primary' : 'border-transparent'}`} />
+                                            {index === primaryImageMarker && <Badge variant="default" className="absolute top-1 left-1 text-xs z-10">Primary</Badge>}
+                                            <Button type="button" variant="destructive" size="icon" className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity z-20" onClick={(e) => {e.stopPropagation(); removeNewPreviewImage(index)}}>
+                                                <XCircle className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         )}

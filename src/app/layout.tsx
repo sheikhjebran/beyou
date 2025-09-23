@@ -1,4 +1,3 @@
-
 import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
@@ -58,9 +57,9 @@ Shop now to glow, gift, and glam!`,
     siteName: 'BeYou',
     images: [
       {
-        url: '/BeYou.png', 
-        width: 130, 
-        height: 60,
+        url: '/icons/BeYou.png',
+        width: 130,
+        height: 130, // Maintaining square aspect ratio
         alt: 'BeYou Logo',
       },
     ],
@@ -75,13 +74,13 @@ Shop now to glow, gift, and glam!`,
       template: '%s | BeYou - Beauty & Custom Prints',
     },
     description: 'A journey from Eidi to Enterprise. Your one-stop shop for affordable kawaii cosmetics, press-on nails, and aesthetic custom prints. Shop now to glow, gift, and glam!',
-    images: [`${SITE_URL}/BeYou.png`], 
+    images: [`${SITE_URL}/icons/BeYou.png`], 
   },
 
   icons: {
-    icon: '/BeYou.png',
-    shortcut: '/BeYou.png',
-    apple: '/BeYou.png',
+    icon: '/icons/BeYou.png',
+    shortcut: '/icons/BeYou.png',
+    apple: '/icons/BeYou.png',
   },
   manifest: '/site.webmanifest',
 };
@@ -92,7 +91,7 @@ export const viewport: Viewport = {
     { media: '(prefers-color-scheme: dark)', color: '#0A0A0A' }, 
   ],
   colorScheme: 'light dark',
-}
+};
 
 // JSON-LD for Organization
 const organizationSchema = {
@@ -100,7 +99,7 @@ const organizationSchema = {
   "@type": "Organization",
   "name": "BeYou",
   "url": SITE_URL,
-  "logo": `${SITE_URL}/BeYou.png`,
+  "logo": `${SITE_URL}/icons/BeYou.png`,
   "contactPoint": {
     "@type": "ContactPoint",
     "telephone": "+91 8088374457",

@@ -34,8 +34,8 @@ function ProductsContent() {
             setLoading(true);
             setError(null);
             try {
-                const fetchedProducts = await getProducts();
-                setProducts(fetchedProducts);
+                const result = await getProducts(1, 50); // Get first 50 products
+                setProducts(result.products);
             } catch (err) {
                 console.warn("Failed to load products on products page:", err);
                 setError(err instanceof Error ? err.message : "An unknown error occurred while fetching products.");
@@ -55,19 +55,17 @@ function ProductsContent() {
 
         const filtered = products.filter((product: Product) => {
             const matchesCategory = !category || product.category === category;
-            const matchesSubCategory = !subCategory || product.subCategory === subCategory;
-            
+            const matchesSubCategory = !subCategory || product.subcategory === subCategory;
+
             const matchesSearch = !normalizedSearchQuery ||
                 product.name.toLowerCase().includes(normalizedSearchQuery) ||
-                product.description.toLowerCase().includes(normalizedSearchQuery);
-
-            return matchesCategory && matchesSubCategory && matchesSearch;
+                (product.description && product.description.toLowerCase().includes(normalizedSearchQuery));            return matchesCategory && matchesSubCategory && matchesSearch;
         });
         
         // Sort the filtered products to show out-of-stock items last
         return filtered.sort((a, b) => {
-            const aInStock = a.quantity > 0;
-            const bInStock = b.quantity > 0;
+            const aInStock = a.stock_quantity > 0;
+            const bInStock = b.stock_quantity > 0;
             if (aInStock && !bInStock) return -1; // a comes first
             if (!aInStock && bInStock) return 1;  // b comes first
             return 0; // maintain original order if both are in/out of stock
@@ -179,9 +177,7 @@ function ProductsContent() {
 export default function ProductsPage() {
   return (
     <div className="flex min-h-screen flex-col">
-      <Header onSearchChange={(term) => {
-          // Navigation is handled by Header's submit function
-      }} />
+      <Header />
        <Suspense fallback={<div className="flex-1 container mx-auto p-6 text-center">Loading filters...</div>}>
          <ProductsContent />
        </Suspense>

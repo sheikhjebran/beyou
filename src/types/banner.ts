@@ -4,7 +4,7 @@ export type Banner = {
   imageUrl: string;
   title?: string; // Now optional
   subtitle?: string; // Now optional
-  createdAt: string; // ISO string representation of Firestore Timestamp
+  createdAt: string; // ISO string representation of creation date
   filePath?: string; // Store the storage path for deletion
 };
 

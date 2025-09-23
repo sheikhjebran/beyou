@@ -74,9 +74,9 @@ export default function CheckoutPage() {
           <Card className="text-center py-12">
             <CardContent>
               <p className="text-muted-foreground mb-4">Your cart is empty.</p>
-              <Link href="/" passHref legacyBehavior>
-                <Button>Continue Shopping</Button>
-              </Link>
+              <Button asChild>
+                <Link href="/">Continue Shopping</Link>
+              </Button>
             </CardContent>
           </Card>
         ) : (
@@ -104,7 +104,7 @@ export default function CheckoutPage() {
                           <TableCell className="pl-2 md:pl-4">
                             <div className="relative w-12 h-12 md:w-16 md:h-16">
                               <Image
-                                src={item.product.primaryImageUrl || 'https://placehold.co/64x64.png'}
+                                src={item.product.primary_image_path || 'https://placehold.co/64x64.png'}
                                 alt={item.product.name}
                                 fill // Use fill for responsive fixed size containers
                                 sizes="64px" // Provide an accurate size
@@ -175,14 +175,15 @@ export default function CheckoutPage() {
               <Separator className="my-4" />
               <CardFooter className="flex flex-col sm:flex-row justify-between items-center p-4 md:p-6 gap-4">
                 <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
-                  <Link href="/" passHref legacyBehavior>
-                    <Button variant="outline">Continue Shopping</Button>
-                  </Link>
-                  <Link href="/exchange-refund-policy" passHref legacyBehavior>
-                    <a className="text-sm font-bold text-foreground hover:text-primary transition-colors flex items-center gap-1">
-                      Exchange & Refund Policy
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
+                  <Button variant="outline" asChild>
+                    <Link href="/">Continue Shopping</Link>
+                  </Button>
+                  <Link 
+                    href="/exchange-refund-policy" 
+                    className="text-sm font-bold text-foreground hover:text-primary transition-colors flex items-center gap-1"
+                  >
+                    Exchange & Refund Policy
+                    <ExternalLink className="h-3 w-3" />
                   </Link>
                 </div>
                 <Button

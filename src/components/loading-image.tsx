@@ -1,72 +1,126 @@
+'use client'
 
-'use client';
+import Image from 'next/image'
+import { cn } from '@/lib/utils'
+import { Loader2, ImageOff } from 'lucide-react'
+import { useState, useEffect } from 'react'
 
-import React, { useState } from 'react';
-import Image, { type ImageProps } from 'next/image';
-import { cn } from '@/lib/utils';
-import { Loader2 } from 'lucide-react'; // Import Loader2 icon
-
-interface LoadingImageProps extends ImageProps {
-  containerClassName?: string;
-  // loadingText prop is no longer used, but kept for API consistency if needed elsewhere
-  loadingText?: string; 
-  imgClassName?: string; 
+interface Props {
+  src: string
+  alt: string
+  width?: number
+  height?: number
+  priority?: boolean
+  quality?: number
+  fill?: boolean
+  sizes?: string
+  className?: string
+  containerClassName?: string
+  imgClassName?: string
+  'data-ai-hint'?: string
 }
 
-export function LoadingImage({
-  containerClassName,
-  loadingText = "Loading...", // Default value, though not displayed directly
-  alt,
-  imgClassName,
-  onLoadingComplete,
-  onError,
-  ...props
-}: LoadingImageProps) {
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
+export function LoadingImage(props: Props) {
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+  const [blurDataURL, setBlurDataURL] = useState<string | undefined>(undefined)
 
-  const handleLoadingComplete = (result: HTMLImageElement) => {
-    setIsLoading(false);
-    if (onLoadingComplete) {
-      onLoadingComplete(result);
+  // Generate blur placeholder
+  useEffect(() => {
+    if (props.src && !blurDataURL) {
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      if (ctx) {
+        canvas.width = 10
+        canvas.height = 10
+        ctx.fillStyle = '#f3f4f6'
+        ctx.fillRect(0, 0, 10, 10)
+        setBlurDataURL(canvas.toDataURL())
+      }
     }
-  };
+  }, [props.src, blurDataURL])
 
-  const handleError = (event: React.SyntheticEvent<HTMLImageElement, Event>) => {
-    setIsLoading(false);
-    setHasError(true);
-    if (onError) {
-      onError(event);
+  // Format local image paths
+  const getImageUrl = (src: string) => {
+    if (src.startsWith('http://') || src.startsWith('https://')) {
+      return src;
     }
+    // Handle data URLs directly without optimization
+    if (src.startsWith('data:')) {
+      return src;
+    }
+    // Convert /uploads paths to use API route
+    if (src.startsWith('/uploads')) {
+      return `/api${src}`;
+    }
+    // For local images, ensure they start with a forward slash
+    return src.startsWith('/') ? src : `/${src}`;
   };
-
-  const imageSrc = hasError ? (props.src.toString().includes('placehold.co') ? props.src : 'https://placehold.co/400x300.png?text=Error') : props.src;
-
 
   return (
-    <div className={cn("relative w-full h-full bg-muted/10", containerClassName)}>
-      {isLoading && !hasError && (
+    <div className={cn('relative w-full h-full bg-muted/10 overflow-hidden', props.containerClassName)}>
+      {loading && !error && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-muted/30 text-primary">
-          <Loader2 className="h-6 w-6 animate-spin" /> {/* Replaced text with Loader2 icon */}
+          <Loader2 className="h-6 w-6 animate-spin" />
         </div>
       )}
-      <Image
-        alt={alt}
-        className={cn(
-          imgClassName, 
-          isLoading || hasError ? 'opacity-25' : 'opacity-100', 
-          'transition-opacity duration-300 ease-in-out'
-        )}
-        onLoadingComplete={handleLoadingComplete}
-        onError={handleError}
-        src={imageSrc} 
-        {...props}
-      />
-      {hasError && !props.src.toString().includes('placehold.co') && (
-         <div className="absolute inset-0 z-10 flex items-center justify-center bg-destructive/10 text-destructive text-xs font-medium p-2 text-center">
-          <span>Image failed to load.</span>
+      {error ? (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted/10 text-muted-foreground">
+          <ImageOff className="h-8 w-8 mb-2" />
+          <p className="text-sm">Failed to load image</p>
         </div>
+      ) : props.src && props.src.startsWith('data:') ? (
+        // Use regular img tag for data URLs to avoid Next.js optimization issues
+        <img
+          src={props.src}
+          alt={props.alt}
+          className={cn(
+            props.className,
+            props.imgClassName,
+            loading ? 'opacity-25' : 'opacity-100',
+            'transition-opacity duration-200',
+            props.fill ? 'absolute inset-0 w-full h-full object-cover' : ''
+          )}
+          style={{
+            width: props.width ? `${props.width}px` : props.fill ? '100%' : undefined,
+            height: props.height ? `${props.height}px` : props.fill ? '100%' : undefined,
+          }}
+          onLoad={() => setLoading(false)}
+          onError={(e) => {
+            const imgElement = e.target as HTMLImageElement;
+            console.error('Image load error:', imgElement.src);
+            setLoading(false);
+            setError(true);
+          }}
+        />
+      ) : (
+        <Image
+          src={props.src && props.src !== '' ? getImageUrl(props.src) : '/images/placeholder.png'}
+          alt={props.alt}
+          width={props.width}
+          height={props.height}
+          priority={props.priority}
+          quality={props.quality || 75}
+          fill={props.fill}
+          sizes={props.sizes}
+          className={cn(
+            props.className,
+            props.imgClassName,
+            loading ? 'opacity-25' : 'opacity-100',
+            'transition-opacity duration-200'
+          )}
+          data-ai-hint={props['data-ai-hint']}
+          onLoad={() => setLoading(false)}
+          onError={(e) => {
+            const imgElement = e.target as HTMLImageElement;
+            console.error('Image load error:', imgElement.src);
+            setLoading(false);
+            setError(true);
+          }}
+        />
       )}
     </div>
-  );
+  )
 }
+
+export default LoadingImage

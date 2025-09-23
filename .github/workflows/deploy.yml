@@ -1,0 +1,56 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [feature/new_latest_migration_mysql]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH commands - git pull, migrate, build, restart
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: 66.116.198.204
+          username: root
+          password: ${{ secrets.SSH_PASSWORD }}
+          script: |
+            # Create persistent storage if it doesn't exist
+            mkdir -p /var/www/beyou/uploads
+
+            # Clean and backup current uploads
+            if [ -d "/var/www/beyou/uploads" ]; then
+              # Create backup
+              mkdir -p /var/www/beyou-uploads-backup
+              cp -r /var/www/beyou/uploads/* /var/www/beyou-uploads-backup/ 2>/dev/null || true
+            fi
+
+            cd /var/www/beyou
+            git config --global --add safe.directory /var/www/beyou
+            git remote set-url origin https://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@github.com/sheikhjebran/beyou.git
+
+            # Stash any local changes
+            git stash
+            git pull origin feature/new_latest_migration_mysql
+            mv .env.local .env.local.backup
+
+            # Ensure production uploads directory exists and has proper permissions
+            mkdir -p /var/www/beyou/uploads/banners
+            mkdir -p /var/www/beyou/uploads/products
+            mkdir -p /var/www/beyou/uploads/categories
+            mkdir -p /var/www/beyou/uploads/profiles
+
+            # Restore uploads from backup
+            if [ -d "/var/www/beyou-uploads-backup" ]; then
+              cp -r /var/www/beyou-uploads-backup/* /var/www/beyou/uploads/ 2>/dev/null || true
+            fi
+
+            # Set proper permissions for uploads directory
+            chown -R www-data:www-data /var/www/beyou/uploads
+            chmod -R 755 /var/www/beyou/uploads
+
+            npm ci
+            npm run migrate:server
+            npm run build
+
+            pm2 restart beyou || pm2 start beyou

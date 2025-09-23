@@ -6,13 +6,14 @@ import { useForm, SubmitHandler, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Image from 'next/image';
+import LoadingImage from '@/components/loading-image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from "@/hooks/use-toast";
-import { addBanner, getBanners, deleteBanner, type AddBannerData } from '@/services/bannerService';
+import { addBanner, getBanners, deleteBanner, addAdminBannerWithProgress, type AddBannerData } from '@/services/bannerService';
 import type { Banner } from '@/types/banner';
 import { Loader2, UploadCloud, Trash2, ImagePlus, AlertCircle, Palette, RefreshCcw } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -37,25 +38,26 @@ const MAX_FILE_SIZE_MB = 5;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
+type BannerFormValues = {
+  title: string;
+  subtitle: string;
+  imageFile: File | null;
+};
+
 const bannerFormSchema = z.object({
   title: z.string()
     .refine(val => val.length === 0 || (val.length >= 3 && val.length <= 100), {
       message: "Title must be empty or between 3 and 100 characters."
-    })
-    .optional()
-    .default(''),
+    }),
   subtitle: z.string()
     .refine(val => val.length === 0 || (val.length >= 5 && val.length <= 200), {
       message: "Subtitle must be empty or between 5 and 200 characters."
-    })
-    .optional()
-    .default(''),
-  imageFile: z.instanceof(File)
-    .refine(file => file.size <= MAX_FILE_SIZE_BYTES, `Image size should be less than ${MAX_FILE_SIZE_MB}MB.`)
-    .refine(file => ALLOWED_IMAGE_TYPES.includes(file.type), `Only .jpg, .png, and .webp formats are supported.`),
+    }),
+  imageFile: z.custom<File>((val) => val instanceof File)
+    .refine(file => file instanceof File && file.size <= MAX_FILE_SIZE_BYTES, `Image size should be less than ${MAX_FILE_SIZE_MB}MB.`)
+    .refine(file => file instanceof File && ALLOWED_IMAGE_TYPES.includes(file.type), `Only .jpg, .png, and .webp formats are supported.`)
+    .nullable(),
 });
-
-type BannerFormValues = z.infer<typeof bannerFormSchema>;
 
 const categoryImageFormSchema = z.object({
   selectedCategory: z.string().min(1, "Please select a category."),
@@ -78,6 +80,11 @@ export default function CustomizePage() {
   const [showDeleteBannerDialog, setShowDeleteBannerDialog] = useState(false);
   const [bannerToDelete, setBannerToDelete] = useState<Banner | null>(null);
   const [isDeletingBanner, setIsDeletingBanner] = useState(false);
+  
+  // Progress tracking states
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState<string>('');
+  const [isUploading, setIsUploading] = useState(false);
 
   const bannerForm = useForm<BannerFormValues>({
     resolver: zodResolver(bannerFormSchema),
@@ -129,20 +136,21 @@ export default function CustomizePage() {
       const fetchCatImage = async () => {
         setIsLoadingCategoryImage(true);
         setCategoryImageError(null);
-        setCategoryImagePreviewUrl(null); // Clear old preview
         categoryImageForm.resetField('categoryImageFile'); // Clear file input
+        
+        const defaultPlaceholder = `/coming-soon.png`;
+        
         try {
           const imageData = await getCategoryImage(watchedCategory);
           setCurrentCategoryData(imageData);
-          if (imageData) {
+          if (imageData?.imageUrl) {
             setCategoryImagePreviewUrl(imageData.imageUrl);
           } else {
-            // Set default placeholder if no custom image
-            setCategoryImagePreviewUrl(`https://placehold.co/400x300.png?text=${encodeURIComponent(watchedCategory)}`);
+            setCategoryImagePreviewUrl(defaultPlaceholder);
           }
         } catch (err) {
           setCategoryImageError(err instanceof Error ? err.message : "Failed to load category image.");
-          setCategoryImagePreviewUrl(`https://placehold.co/400x300.png?text=Error`); // Error placeholder
+          setCategoryImagePreviewUrl(defaultPlaceholder);
         } finally {
           setIsLoadingCategoryImage(false);
         }
@@ -169,24 +177,69 @@ export default function CustomizePage() {
   };
 
   const onBannerSubmit: SubmitHandler<BannerFormValues> = async (data) => {
+    console.log('onBannerSubmit called with data:', {
+      hasImageFile: !!data.imageFile,
+      imageFileName: data.imageFile?.name,
+      imageFileSize: data.imageFile?.size,
+      imageFileType: data.imageFile?.type,
+      title: data.title,
+      subtitle: data.subtitle
+    });
+    
+    if (!data.imageFile) {
+      setBannerError("Please select an image file.");
+      return;
+    }
+    
+    if (!(data.imageFile instanceof File)) {
+      setBannerError("Invalid file selected.");
+      return;
+    }
+    
     setIsSubmittingBanner(true);
+    setIsUploading(true);
+    setUploadProgress(0);
+    setUploadStatus('Starting upload...');
+    setBannerError(null);
+    
     try {
       // Pass title and subtitle, which might be empty strings from the form if not filled
-      await addBanner({
+      console.log('Calling addAdminBannerWithProgress with:', {
         imageFile: data.imageFile,
         title: data.title,
         subtitle: data.subtitle,
       });
-      toast({ title: "Banner Added", description: "New banner successfully uploaded." });
+      
+      await addAdminBannerWithProgress({
+        imageFile: data.imageFile,
+        title: data.title,
+        subtitle: data.subtitle,
+      }, (progress, status) => {
+        setUploadProgress(Math.round(progress));
+        setUploadStatus(status);
+      });
+      
+      toast({ 
+        title: "Banner Added Successfully", 
+        description: `Banner "${data.title || 'Untitled'}" has been uploaded and added to your collection.`
+      });
       bannerForm.reset();
       setBannerImagePreviewUrl(null);
       // Re-fetch banners to update list
       const fetchedBanners = await getBanners();
       setBanners(fetchedBanners);
     } catch (err) {
-      toast({ variant: "destructive", title: "Error Adding Banner", description: err instanceof Error ? err.message : "An unexpected error occurred." });
+      console.error('Banner submission error:', err);
+      toast({ 
+        variant: "destructive", 
+        title: "Upload Failed", 
+        description: `Failed to add banner: ${err instanceof Error ? err.message : "An unexpected error occurred."}` 
+      });
     } finally {
       setIsSubmittingBanner(false);
+      setIsUploading(false);
+      setUploadProgress(0);
+      setUploadStatus('');
     }
   };
   
@@ -203,7 +256,7 @@ export default function CustomizePage() {
     if (!bannerToDelete) return;
     setIsDeletingBanner(true);
     try {
-      await deleteBanner(bannerToDelete.id, bannerToDelete.filePath);
+      await deleteBanner(bannerToDelete.id);
       toast({ title: "Banner Deleted", description: `Banner "${bannerToDelete.title || 'Untitled'}" deleted.` });
       setBanners(prev => prev.filter(b => b.id !== bannerToDelete.id));
     } catch (err) {
@@ -229,7 +282,7 @@ export default function CustomizePage() {
       if (currentCategoryData) {
         setCategoryImagePreviewUrl(currentCategoryData.imageUrl);
       } else if (watchedCategory) {
-        setCategoryImagePreviewUrl(`https://placehold.co/400x300.png?text=${encodeURIComponent(watchedCategory)}`);
+        setCategoryImagePreviewUrl(`/coming-soon.png`);
       } else {
         setCategoryImagePreviewUrl(null);
       }
@@ -244,9 +297,13 @@ export default function CustomizePage() {
     setIsUpdatingCategoryImage(true);
     setCategoryImageError(null);
     try {
-      const newImageUrl = await updateCategoryImage(data.selectedCategory, data.categoryImageFile);
-      setCurrentCategoryData({ imageUrl: newImageUrl, filePath: '', updatedAt: new Date() as any }); // filePath not immediately known here, service handles it
-      setCategoryImagePreviewUrl(newImageUrl);
+      await updateCategoryImage(data.selectedCategory, data.categoryImageFile);
+      // After update, fetch the new image data
+      const imageData = await getCategoryImage(data.selectedCategory);
+      setCurrentCategoryData(imageData);
+      if (imageData) {
+        setCategoryImagePreviewUrl(imageData.imageUrl);
+      }
       toast({ title: "Category Image Updated", description: `Image for "${data.selectedCategory}" has been updated.` });
       categoryImageForm.resetField('categoryImageFile'); // Clear file input
     } catch (err) {
@@ -258,7 +315,7 @@ export default function CustomizePage() {
   };
 
   const openDeleteCatImgConfirmationDialog = (categoryName: string) => {
-     if (!categoryName || !currentCategoryData?.imageUrl || currentCategoryData.imageUrl.includes('placehold.co')) {
+     if (!categoryName || !currentCategoryData?.imageUrl || currentCategoryData.imageUrl.includes('coming-soon.png')) {
       toast({ variant: "default", title: "No Custom Image", description: `There is no custom image to delete for "${categoryName}".` });
       return;
     }
@@ -274,7 +331,7 @@ export default function CustomizePage() {
       await deleteCategoryImage(categoryToDeleteImageFor);
       toast({ title: "Category Image Deleted", description: `Custom image for "${categoryToDeleteImageFor}" has been removed.` });
       setCurrentCategoryData(null); // Clear current image data
-      setCategoryImagePreviewUrl(`https://placehold.co/400x300.png?text=${encodeURIComponent(categoryToDeleteImageFor)}`); // Revert to placeholder
+      setCategoryImagePreviewUrl(`/coming-soon.png`); // Revert to placeholder
       categoryImageForm.resetField('categoryImageFile');
     } catch (err) {
       setCategoryImageError(err instanceof Error ? err.message : "Failed to delete category image.");
@@ -323,7 +380,7 @@ export default function CustomizePage() {
                   </FormControl>
                   {bannerImagePreviewUrl && (
                     <div className="mt-4 relative w-48 h-24 aspect-video mx-auto">
-                      <Image src={bannerImagePreviewUrl} alt="New banner preview" fill className="object-contain rounded-md border" />
+                      <LoadingImage src={bannerImagePreviewUrl} alt="New banner preview" fill imgClassName="object-contain rounded-md border" />
                     </div>
                   )}
                   <FormMessage />
@@ -331,8 +388,29 @@ export default function CustomizePage() {
               )} />
               <FormField control={bannerForm.control} name="title" render={({ field }) => (<FormItem><FormLabel>Title (Optional)</FormLabel><FormControl><Input placeholder="e.g., Summer Collection Out Now!" {...field} /></FormControl><FormMessage /></FormItem>)} />
               <FormField control={bannerForm.control} name="subtitle" render={({ field }) => (<FormItem><FormLabel>Subtitle (Optional)</FormLabel><FormControl><Textarea placeholder="e.g., Fresh styles to brighten your wardrobe." {...field} /></FormControl><FormMessage /></FormItem>)} />
-              <Button type="submit" disabled={isSubmittingBanner || !bannerForm.formState.isValid} className="w-full md:w-auto">
-                {isSubmittingBanner ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImagePlus className="mr-2 h-4 w-4" />} Add Banner
+              
+              {/* Progress Indicator */}
+              {isUploading && (
+                <div className="space-y-2 p-4 bg-muted rounded-md">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">Uploading...</span>
+                    <span className="text-muted-foreground">{uploadProgress}%</span>
+                  </div>
+                  <div className="w-full bg-background rounded-full h-2">
+                    <div 
+                      className="bg-primary h-2 rounded-full transition-all duration-300 ease-in-out" 
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                  {uploadStatus && (
+                    <p className="text-xs text-muted-foreground mt-1">{uploadStatus}</p>
+                  )}
+                </div>
+              )}
+              
+              <Button type="submit" disabled={isSubmittingBanner || !bannerForm.formState.isValid || isUploading} className="w-full md:w-auto">
+                {isSubmittingBanner || isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImagePlus className="mr-2 h-4 w-4" />} 
+                {isUploading ? 'Uploading...' : 'Add Banner'}
               </Button>
             </form>
           </Form>
@@ -354,7 +432,15 @@ export default function CustomizePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {banners.map((banner) => (
                 <Card key={banner.id} className="flex flex-col">
-                  <div className="relative w-full h-40 aspect-video"><Image src={banner.imageUrl} alt={banner.title || 'Banner image'} fill className="object-cover rounded-t-lg" sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"/></div>
+                  <div className="relative w-full h-40 aspect-video">
+                    <LoadingImage 
+                      src={banner.imageUrl} 
+                      alt={banner.title || 'Banner image'} 
+                      fill 
+                      imgClassName="object-cover rounded-t-lg" 
+                      sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    />
+                  </div>
                   <CardContent className="p-4 space-y-2 flex-grow">
                     {banner.title && <h3 className="font-semibold text-lg truncate" title={banner.title}>{banner.title}</h3>}
                     {banner.subtitle && <p className="text-sm text-muted-foreground line-clamp-2" title={banner.subtitle}>{banner.subtitle}</p>}
@@ -414,7 +500,7 @@ export default function CustomizePage() {
                       <Skeleton className="w-full h-48 rounded-md" />
                     ) : categoryImagePreviewUrl ? (
                       <div className="relative w-full h-48 aspect-video border rounded-md overflow-hidden bg-muted/30">
-                        <Image src={categoryImagePreviewUrl} alt={`Current image for ${watchedCategory}`} fill className="object-contain" data-ai-hint={`${watchedCategory.toLowerCase()} category display`} />
+                        <LoadingImage src={categoryImagePreviewUrl} alt={`Current image for ${watchedCategory}`} fill imgClassName="object-contain" data-ai-hint={`${watchedCategory.toLowerCase()} category display`} />
                       </div>
                     ) : (
                       <div className="w-full h-48 border-2 border-dashed rounded-lg flex items-center justify-center bg-muted/50 text-muted-foreground">
@@ -459,7 +545,12 @@ export default function CustomizePage() {
                       type="button"
                       variant="destructive"
                       onClick={() => openDeleteCatImgConfirmationDialog(watchedCategory)}
-                      disabled={isDeletingCategoryImage || !watchedCategory || !currentCategoryData?.imageUrl || currentCategoryData.imageUrl.includes('placehold.co')}
+                      disabled={
+                        isDeletingCategoryImage || 
+                        !watchedCategory || 
+                        !currentCategoryData?.imageUrl || 
+                        currentCategoryData.imageUrl === '/coming-soon.png'
+                      }
                       className="w-full sm:w-auto"
                     >
                       <Trash2 className="mr-2 h-4 w-4" /> Delete Custom Image

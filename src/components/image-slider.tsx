@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { LoadingImage } from './loading-image'; // Import LoadingImage
+import LoadingImage from './loading-image'; // Import LoadingImage
 
 interface SliderImage {
   src: string;
@@ -76,7 +76,6 @@ const ImageSlider: React.FC<ImageSliderProps> = ({
               priority={image.priority || index === 0}
               data-ai-hint={image.dataAiHint || 'banner image'}
               sizes="100vw" // Simplified for full-width hero elements
-              loadingText="Loading banner..."
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/30 to-transparent" />
             

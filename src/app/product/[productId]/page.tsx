@@ -1,7 +1,7 @@
 
 import React, { Suspense } from 'react';
 import type { Metadata, ResolvingMetadata } from 'next';
-import { getProductById } from '@/services/productService';
+import { getProductById } from '@/services/server/productServerService';
 import { notFound } from 'next/navigation';
 import { Header } from '@/components/header';
 import { Footer } from '@/components/footer';
@@ -13,7 +13,7 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
 type ProductPageProps = {
-  params: { productId: string };
+  params: Promise<{ productId: string }>;
 };
 
 // Server-side function to generate metadata for SEO
@@ -21,36 +21,41 @@ export async function generateMetadata(
   { params }: ProductPageProps,
   parent: ResolvingMetadata
 ): Promise<Metadata> {
-  const productId = params.productId;
-  const product = await getProductById(productId);
+  try {
+    const resolvedParams = await params;
+    const productId = String(resolvedParams?.productId);
+    const product = await getProductById(productId);
 
-  if (!product) {
+    if (!product) {
+      return {
+        title: 'Product Not Found',
+        description: 'The product you are looking for does not exist.',
+      };
+    }
+
     return {
-      title: 'Product Not Found',
-      description: 'The product you are looking for does not exist.',
+      title: `${product.name} - ${product.category}`,
+      description: `Shop for ${product.name}. ${product.description?.substring(0, 150) || 'No description available'}...`,
+      openGraph: {
+        title: `${product.name} | BeYou`,
+        description: product.description?.substring(0, 150) || 'No description available',
+        images: [
+          {
+            url: product.primary_image_path || '/images/placeholder.png',
+            width: 600,
+            height: 600,
+            alt: product.name,
+          },
+        ],
+      },
+    };
+  } catch (error) {
+    console.error('Error generating metadata:', error);
+    return {
+      title: 'Error',
+      description: 'An error occurred while loading the product.',
     };
   }
-
-  // Optional: You can resolve previous metadata for augmentation
-  // const previousImages = (await parent).openGraph?.images || [];
-
-  return {
-    title: `${product.name} - ${product.category}`,
-    description: `Shop for ${product.name}. ${product.description.substring(0, 150)}...`,
-    openGraph: {
-      title: `${product.name} | BeYou`,
-      description: product.description.substring(0, 150),
-      images: [
-        {
-          url: product.primaryImageUrl,
-          width: 600,
-          height: 600,
-          alt: product.name,
-        },
-        // ...previousImages,
-      ],
-    },
-  };
 }
 
 // Loading component for Suspense boundary
@@ -80,24 +85,26 @@ function ProductDetailsLoading() {
 
 // The main server component for the product detail page
 export default async function ProductDetailPage({ params }: ProductPageProps) {
-  const productId = params.productId;
+  try {
+    const resolvedParams = await params;
+    const productId = String(resolvedParams?.productId);
 
-  if (!productId) {
-    notFound();
-  }
-  
-  // Fetch data on the server
-  const product = await getProductById(productId);
+    if (!productId) {
+      notFound();
+    }
+    
+    // Fetch data on the server
+    const product = await getProductById(productId);
 
-  if (!product) {
-    notFound();
-  }
+    if (!product) {
+      notFound();
+    }
 
-  return (
-    <div className="flex min-h-screen flex-col">
-      <Header />
-      <main className="flex-1 container mx-auto p-4 md:p-8">
-        <div className="mb-6">
+    return (
+      <div className="flex min-h-screen flex-col">
+        <Header />
+        <main className="flex-1 container mx-auto p-4 md:p-8">
+          <div className="mb-6">
           <Button variant="outline" asChild>
             <Link href="/products">
               <ArrowLeft className="mr-2 h-4 w-4" /> Back to Products
@@ -113,4 +120,8 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
       <Footer />
     </div>
   );
+  } catch (error) {
+    console.error('Error loading product:', error);
+    throw error; // Let Next.js error boundary handle it
+  }
 }

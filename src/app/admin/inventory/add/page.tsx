@@ -14,7 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from "@/hooks/use-toast";
-import { addProduct, type AddProductData } from '@/services/productService';
+import { addProduct } from '@/services/productService';
+import type { AddProductData } from '@/types/productForm';
 import { Loader2, ArrowLeft, AlertCircle, UploadCloud, XCircle } from 'lucide-react';
 import Link from 'next/link';
 import { getMainCategories, getSubCategories, type Category } from '@/lib/categories';
@@ -33,7 +34,7 @@ const productFormSchema = z.object({
   subCategory: z.string().optional(),
   description: z.string().min(10, { message: "Description must be at least 10 characters." }),
   price: z.coerce.number().min(0.01, { message: "Price must be a positive number." }),
-  quantity: z.coerce.number().int().min(0, { message: "Quantity must be a non-negative integer." }),
+  stock_quantity: z.coerce.number().int().min(0, { message: "Stock quantity must be a non-negative integer." }),
   imageFiles: z.array(z.instanceof(File))
     .min(1, "Please upload at least one image.") // Ensure at least one image
     .max(MAX_FILES, `You can upload a maximum of ${MAX_FILES} images.`)
@@ -78,7 +79,7 @@ export default function AddProductPage() {
       subCategory: '',
       description: '',
       price: 0,
-      quantity: 0,
+      stock_quantity: 0,
       imageFiles: [], // Initialize as empty array
     },
   });
@@ -159,7 +160,7 @@ export default function AddProductPage() {
         subCategory: data.category === 'Custom Prints' ? '' : data.subCategory || '',
         description: data.description,
         price: data.price,
-        quantity: data.quantity,
+        stock_quantity: data.stock_quantity,
         imageFiles: data.imageFiles || [],
         primaryImageIndex: primaryImageIndex,
     };
@@ -190,7 +191,7 @@ export default function AddProductPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-4">
-        <Link href="/admin/inventory" passHref legacyBehavior>
+        <Link href="/admin/inventory" className="inline-block">
            <Button variant="outline" size="icon" className="h-8 w-8">
               <ArrowLeft className="h-4 w-4" />
               <span className="sr-only">Back to Inventory</span>
@@ -212,7 +213,7 @@ export default function AddProductPage() {
                 <FormField control={form.control} name="subCategory" render={({ field }) => (<FormItem><FormLabel>Sub-Category</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={!selectedCategory || selectedCategory === 'Custom Prints' || availableSubCategories.length === 0}><FormControl><SelectTrigger><SelectValue placeholder={selectedCategory === 'Custom Prints' ? "N/A (Custom Prints)" : (selectedCategory ? "Select sub-category" : "Select category first")} /></SelectTrigger></FormControl><SelectContent>{availableSubCategories.map((subCat) => (<SelectItem key={subCat} value={subCat}>{subCat}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem>)} />
                 <FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel>Description</FormLabel><FormControl><Textarea placeholder="Detailed description of the product..." {...field} /></FormControl><FormMessage /></FormItem>)} />
                 <FormField control={form.control} name="price" render={({ field }) => (<FormItem><FormLabel>Price (₹)</FormLabel><FormControl><Input type="number" step="0.01" placeholder="e.g., 24.99" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                <FormField control={form.control} name="quantity" render={({ field }) => (<FormItem><FormLabel>Quantity</FormLabel><FormControl><Input type="number" placeholder="e.g., 100" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="stock_quantity" render={({ field }) => (<FormItem><FormLabel>Stock Quantity</FormLabel><FormControl><Input type="number" placeholder="e.g., 100" {...field} /></FormControl><FormMessage /></FormItem>)} />
                 
                 <FormField
                   control={form.control}
