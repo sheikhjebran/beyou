@@ -45,6 +45,10 @@ export function LoadingImage(props: Props) {
     if (src.startsWith('http://') || src.startsWith('https://')) {
       return src;
     }
+    // Handle data URLs directly without optimization
+    if (src.startsWith('data:')) {
+      return src;
+    }
     // Convert /uploads paths to use API route
     if (src.startsWith('/uploads')) {
       return `/api${src}`;
@@ -65,6 +69,30 @@ export function LoadingImage(props: Props) {
           <ImageOff className="h-8 w-8 mb-2" />
           <p className="text-sm">Failed to load image</p>
         </div>
+      ) : props.src && props.src.startsWith('data:') ? (
+        // Use regular img tag for data URLs to avoid Next.js optimization issues
+        <img
+          src={props.src}
+          alt={props.alt}
+          className={cn(
+            props.className,
+            props.imgClassName,
+            loading ? 'opacity-25' : 'opacity-100',
+            'transition-opacity duration-200',
+            props.fill ? 'absolute inset-0 w-full h-full object-cover' : ''
+          )}
+          style={{
+            width: props.width ? `${props.width}px` : props.fill ? '100%' : undefined,
+            height: props.height ? `${props.height}px` : props.fill ? '100%' : undefined,
+          }}
+          onLoad={() => setLoading(false)}
+          onError={(e) => {
+            const imgElement = e.target as HTMLImageElement;
+            console.error('Image load error:', imgElement.src);
+            setLoading(false);
+            setError(true);
+          }}
+        />
       ) : (
         <Image
           src={props.src && props.src !== '' ? getImageUrl(props.src) : '/images/placeholder.png'}
