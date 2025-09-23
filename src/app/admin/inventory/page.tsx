@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { PlusCircle, Edit, Trash2, PackageSearch, AlertCircle, Loader2, Star } from 'lucide-react';
-import Image from 'next/image';
+import { LoadingImage } from '@/components/loading-image';
 import Link from 'next/link';
 import { getProducts, deleteProduct as deleteProductService, updateProductBestSellerStatus } from '@/services/productService';
 import type { Product } from '@/types/product';
@@ -276,7 +276,7 @@ export default function InventoryPage() {
                   <TableRow key={product.id}>
                     <TableCell>
                       <div className="relative w-16 h-16">
-                        <Image
+                        <LoadingImage
                           src={product.primary_image_path || '/images/placeholder.png'}
                           alt={product.name}
                           fill // Use fill for responsive fixed size containers
