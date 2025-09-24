@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as bannerService from '@/services/server/bannerService';
 import { withAdminAuth } from '@/middleware/admin-auth';
-import formidable from 'formidable';
-import { promises as fs } from 'fs';
 
 // GET /api/admin/banners - Get all banners
 async function GETHandler(request: NextRequest) {
@@ -18,14 +16,11 @@ async function GETHandler(request: NextRequest) {
     }
 }
 
-// Fixed POSTHandler using formidable for reliable multipart parsing
+// Simplified POSTHandler using Next.js built-in FormData with better error handling
 async function POSTHandler(request: NextRequest) {
     try {
         const contentType = request.headers.get('content-type');
         console.log('Request content-type:', contentType);
-
-        // Log raw headers for debugging
-        console.log('Request headers:', Object.fromEntries(request.headers.entries()));
 
         if (!contentType || !contentType.includes('multipart/form-data')) {
             console.error('Invalid content-type:', contentType);
@@ -35,109 +30,105 @@ async function POSTHandler(request: NextRequest) {
             );
         }
 
-        console.log('Processing FormData request with formidable...');
-
-        // Convert NextRequest to Node.js IncomingMessage format for formidable
-        const body = await request.arrayBuffer();
-        const buffer = Buffer.from(body);
-
-        // Create a mock IncomingMessage-like object
-        const mockRequest = {
-            headers: Object.fromEntries(request.headers.entries()),
-            method: request.method,
-            url: request.url,
-            body: buffer,
-            pipe: (dest: any) => {
-                dest.write(buffer);
-                dest.end();
-                return dest;
-            },
-            on: (event: string, callback: Function) => {
-                if (event === 'data') {
-                    callback(buffer);
-                } else if (event === 'end') {
-                    callback();
-                }
-            },
-            pause: () => {},
-            resume: () => {},
-            read: () => buffer,
-        } as any;
-
-        const form = new formidable.IncomingForm({
-            maxFileSize: 10 * 1024 * 1024, // 10MB limit
-        });
-
-        const parseFormData = (): Promise<{ fields: formidable.Fields; files: formidable.Files }> => {
-            return new Promise((resolve, reject) => {
-                form.parse(mockRequest, (err, fields, files) => {
-                    if (err) {
-                        console.error('Formidable parsing error:', err);
-                        reject(err);
-                    } else {
-                        console.log('Formidable parsed successfully');
-                        console.log('Fields:', Object.keys(fields));
-                        console.log('Files:', Object.keys(files));
-                        resolve({ fields, files });
-                    }
-                });
-            });
-        };
-
-        const { fields, files } = await parseFormData();
-
-        // Extract the image file
-        const imageFile = Array.isArray(files.imageFile) ? files.imageFile[0] : files.imageFile;
+        console.log('Processing FormData request...');
         
-        if (!imageFile) {
-            console.error('No image file found in upload');
+        let formData;
+        try {
+            formData = await request.formData();
+            console.log('FormData parsed successfully');
+            console.log('FormData keys:', Array.from(formData.keys()));
+        } catch (formDataError) {
+            console.error('Failed to parse FormData:', formDataError);
+            
+            // Try to get more details about the error
+            const errorDetails = formDataError instanceof Error ? formDataError.message : String(formDataError);
+            console.error('FormData error details:', errorDetails);
+            
             return NextResponse.json(
-                { message: 'No image file provided' },
+                { 
+                    message: 'Failed to parse FormData', 
+                    error: errorDetails,
+                    debug: {
+                        contentType,
+                        hasBody: request.body !== null
+                    }
+                },
                 { status: 400 }
             );
         }
 
-        console.log('Image file details:', {
-            originalFilename: imageFile.originalFilename,
-            size: imageFile.size,
-            mimetype: imageFile.mimetype,
-            filepath: imageFile.filepath
+        // Extract the image file
+        const imageFileEntry = formData.get('imageFile');
+        console.log('Image file entry type:', imageFileEntry ? imageFileEntry.constructor.name : 'null');
+        console.log('Image file entry:', imageFileEntry);
+
+        if (!imageFileEntry) {
+            console.error('No imageFile field found in FormData');
+            return NextResponse.json(
+                { message: 'No imageFile field provided' },
+                { status: 400 }
+            );
+        }
+
+        if (!(imageFileEntry instanceof File)) {
+            console.error('imageFile is not a File object:', typeof imageFileEntry);
+            return NextResponse.json(
+                { message: 'imageFile must be a File object' },
+                { status: 400 }
+            );
+        }
+
+        console.log('File details:', {
+            name: imageFileEntry.name,
+            size: imageFileEntry.size,
+            type: imageFileEntry.type
         });
 
-        // Read the file content
-        const fileBuffer = await fs.readFile(imageFile.filepath);
-        console.log('File buffer size:', fileBuffer.length);
+        if (imageFileEntry.size === 0) {
+            console.error('Empty file provided');
+            return NextResponse.json(
+                { message: 'Empty file provided' },
+                { status: 400 }
+            );
+        }
 
         // Extract title and subtitle (optional)
-        const title = Array.isArray(fields.title) ? fields.title[0] : fields.title || '';
-        const subtitle = Array.isArray(fields.subtitle) ? fields.subtitle[0] : fields.subtitle || '';
+        const titleEntry = formData.get('title');
+        const subtitleEntry = formData.get('subtitle');
 
-        console.log('Form data:', { title, subtitle });
+        const title = typeof titleEntry === 'string' ? titleEntry || undefined : undefined;
+        const subtitle = typeof subtitleEntry === 'string' ? subtitleEntry || undefined : undefined;
+
+        console.log('Form fields:', { title, subtitle });
+
+        // Convert file to buffer
+        console.log('Converting file to buffer...');
+        const arrayBuffer = await imageFileEntry.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        console.log('File buffer size:', buffer.length);
 
         // Add the banner
+        console.log('Adding banner to service...');
         const banner = await bannerService.addBanner({
-            imageBuffer: fileBuffer,
-            originalFilename: imageFile.originalFilename || 'upload.jpg',
-            title: title || undefined,
-            subtitle: subtitle || undefined,
+            imageBuffer: buffer,
+            originalFilename: imageFileEntry.name,
+            title,
+            subtitle,
         });
 
         console.log('Banner added successfully:', banner.id);
-
-        // Clean up temp file
-        try {
-            await fs.unlink(imageFile.filepath);
-        } catch (cleanupError) {
-            console.warn('Failed to cleanup temp file:', cleanupError);
-        }
-
         return NextResponse.json(banner);
+
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        console.error('Error adding banner:', errorMessage);
+        console.error('Error in POSTHandler:', errorMessage);
         console.error('Error stack:', error instanceof Error ? error.stack : 'No stack available');
+        
         return NextResponse.json(
-            { message: 'Error adding banner', error: errorMessage },
+            { 
+                message: 'Error adding banner', 
+                error: errorMessage 
+            },
             { status: 500 }
         );
     }
