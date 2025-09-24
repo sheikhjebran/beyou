@@ -17,7 +17,7 @@ async function GETHandler(request: NextRequest) {
     }
 }
 
-// Enhanced debugging and fallback for empty request body issue
+// Fixed POSTHandler - avoiding body consumption issue
 async function POSTHandler(request: NextRequest) {
     try {
         const contentType = request.headers.get('content-type');
@@ -26,35 +26,11 @@ async function POSTHandler(request: NextRequest) {
         // Log raw headers for debugging
         console.log('Request headers:', Object.fromEntries(request.headers.entries()));
 
-        // Attempt to read the raw request body
-        let bodyText = '';
-        try {
-            bodyText = await request.text();
-            console.log('Raw request body length:', bodyText.length);
-            console.log('Raw request body preview:', bodyText.substring(0, 100) + (bodyText.length > 100 ? '...' : ''));
-        } catch (error) {
-            console.error('Failed to read raw request body:', error);
-        }
-
-        if (!bodyText || bodyText.trim().length === 0) {
-            console.error('Empty request body received');
-            return NextResponse.json(
-                { message: 'Empty request body' },
-                { status: 400 }
-            );
-        }
-
-        // Reset the request body for further processing
-        request = new NextRequest(request.url, {
-            method: request.method,
-            headers: request.headers,
-            body: bodyText,
-        });
-
         if (contentType && contentType.includes('application/json')) {
             console.log('Processing JSON request with base64 file...');
             let requestData;
             try {
+                const bodyText = await request.text();
                 requestData = JSON.parse(bodyText);
             } catch (parseError) {
                 const errorMessage = parseError instanceof Error ? parseError.message : 'Unknown error';
@@ -95,10 +71,24 @@ async function POSTHandler(request: NextRequest) {
         }
 
         console.log('Processing FormData request...');
-        const formData = await request.formData();
-        console.log('FormData keys:', Array.from(formData.keys()));
+        
+        // Directly parse FormData without consuming body first
+        let formData;
+        try {
+            formData = await request.formData();
+            console.log('FormData keys:', Array.from(formData.keys()));
+        } catch (formDataError) {
+            console.error('Failed to parse FormData:', formDataError);
+            return NextResponse.json(
+                { message: 'Failed to parse FormData', error: formDataError instanceof Error ? formDataError.message : 'Unknown error' },
+                { status: 400 }
+            );
+        }
 
         const imageFileEntry = formData.get('imageFile');
+        console.log('Image file entry:', imageFileEntry);
+        console.log('Image file entry type:', imageFileEntry ? imageFileEntry.constructor.name : 'null');
+
         if (!imageFileEntry || !(imageFileEntry instanceof File)) {
             console.error('No valid file provided in FormData');
             return NextResponse.json(
@@ -110,10 +100,15 @@ async function POSTHandler(request: NextRequest) {
         const titleEntry = formData.get('title');
         const subtitleEntry = formData.get('subtitle');
 
+        console.log('Form fields:', { title: titleEntry, subtitle: subtitleEntry });
+
         const title = typeof titleEntry === 'string' ? titleEntry : undefined;
         const subtitle = typeof subtitleEntry === 'string' ? subtitleEntry : undefined;
 
+        console.log('Converting file to buffer...');
         const buffer = await imageFileEntry.arrayBuffer();
+        console.log('File buffer size:', buffer.byteLength);
+
         const banner = await bannerService.addBanner({
             imageBuffer: Buffer.from(buffer),
             originalFilename: imageFileEntry.name,
@@ -126,6 +121,7 @@ async function POSTHandler(request: NextRequest) {
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         console.error('Error adding banner:', errorMessage);
+        console.error('Error stack:', error instanceof Error ? error.stack : 'No stack available');
         return NextResponse.json(
             { message: 'Error adding banner', error: errorMessage },
             { status: 500 }
