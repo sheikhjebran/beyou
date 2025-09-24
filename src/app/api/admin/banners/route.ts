@@ -17,7 +17,7 @@ async function GETHandler(request: NextRequest) {
     }
 }
 
-// Enhanced error handling and debugging for POSTHandler
+// Enhanced debugging for empty request body issue
 async function POSTHandler(request: NextRequest) {
     try {
         const contentType = request.headers.get('content-type');
@@ -28,6 +28,9 @@ async function POSTHandler(request: NextRequest) {
 
         // Validate request body early
         const bodyText = await request.text();
+        console.log('Raw request body length:', bodyText.length);
+        console.log('Raw request body preview:', bodyText.substring(0, 100) + (bodyText.length > 100 ? '...' : ''));
+
         if (!bodyText || bodyText.trim().length === 0) {
             console.error('Empty request body received');
             return NextResponse.json(
@@ -100,15 +103,18 @@ async function POSTHandler(request: NextRequest) {
         }
 
         // Fix type assignment for title and subtitle
-        const title = formData.get('title');
-        const subtitle = formData.get('subtitle');
+        const titleEntry = formData.get('title');
+        const subtitleEntry = formData.get('subtitle');
+
+        const title = typeof titleEntry === 'string' ? titleEntry : undefined;
+        const subtitle = typeof subtitleEntry === 'string' ? subtitleEntry : undefined;
 
         const buffer = await imageFileEntry.arrayBuffer();
         const banner = await bannerService.addBanner({
             imageBuffer: Buffer.from(buffer),
             originalFilename: imageFileEntry.name,
-            title: typeof title === 'string' ? title : undefined,
-            subtitle: typeof subtitle === 'string' ? subtitle : undefined,
+            title,
+            subtitle,
         });
 
         console.log('Banner added successfully:', banner.id);
