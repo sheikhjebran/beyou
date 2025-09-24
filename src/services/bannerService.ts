@@ -71,6 +71,9 @@ export async function addAdminBanner(data: AddBannerData, onProgress?: ProgressC
         const response = await fetch('/api/admin/banners', {
             method: 'POST',
             credentials: 'include',
+            headers: {
+                'Accept': 'application/json',
+            },
             body: formData,
         });
         

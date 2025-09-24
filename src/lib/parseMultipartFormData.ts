@@ -17,17 +17,27 @@ export async function parseMultipartFormData(request: Request): Promise<ParsedFo
   }
 
   // Extract boundary from content-type header
-  const boundaryMatch = contentType.match(/boundary=(.+)$/);
+  const boundaryMatch = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/);
   if (!boundaryMatch) {
     throw new Error('No boundary found in content-type');
   }
   
-  const boundary = boundaryMatch[1];
+  const boundary = boundaryMatch[1] || boundaryMatch[2];
   console.log('Manual parser - boundary:', boundary);
   
-  const body = await request.arrayBuffer();
-  const bodyBuffer = Buffer.from(body);
-  console.log('Manual parser - body length:', bodyBuffer.length);
+  // Clone the request to ensure we can read it
+  const clonedRequest = request.clone();
+  
+  // First try to get the body as array buffer
+  let bodyBuffer: Buffer;
+  try {
+    const body = await clonedRequest.arrayBuffer();
+    bodyBuffer = Buffer.from(body);
+    console.log('Manual parser - successfully read body, length:', bodyBuffer.length);
+  } catch (error) {
+    console.error('Failed to read request body as array buffer:', error);
+    throw new Error('Failed to read request body');
+  }
   
   if (bodyBuffer.length === 0) {
     throw new Error('Empty request body');

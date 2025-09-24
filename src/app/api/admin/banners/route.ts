@@ -101,10 +101,24 @@ async function POSTHandler(request: NextRequest) {
         const requestClone = request.clone();
         
         try {
+            // Clone request for backup parsing
             const formData = await request.formData();
             console.log('FormData keys:', Array.from(formData.keys()));
             
-            file = formData.get('imageFile') as File;
+            const imageFileEntry = formData.get('imageFile');
+            console.log('Image file entry type:', imageFileEntry?.constructor.name);
+            
+            if (imageFileEntry && (imageFileEntry instanceof File || imageFileEntry instanceof Blob)) {
+                file = imageFileEntry as File;
+                console.log('File details:', {
+                    name: file.name,
+                    size: file.size,
+                    type: file.type
+                });
+            } else {
+                console.log('imageFile is not a File/Blob:', imageFileEntry);
+            }
+            
             title = formData.get('title') as string || '';
             subtitle = formData.get('subtitle') as string || '';
             
