@@ -17,7 +17,7 @@ async function GETHandler(request: NextRequest) {
     }
 }
 
-// Enhanced debugging for empty request body issue
+// Enhanced debugging and fallback for empty request body issue
 async function POSTHandler(request: NextRequest) {
     try {
         const contentType = request.headers.get('content-type');
@@ -26,10 +26,15 @@ async function POSTHandler(request: NextRequest) {
         // Log raw headers for debugging
         console.log('Request headers:', Object.fromEntries(request.headers.entries()));
 
-        // Validate request body early
-        const bodyText = await request.text();
-        console.log('Raw request body length:', bodyText.length);
-        console.log('Raw request body preview:', bodyText.substring(0, 100) + (bodyText.length > 100 ? '...' : ''));
+        // Attempt to read the raw request body
+        let bodyText = '';
+        try {
+            bodyText = await request.text();
+            console.log('Raw request body length:', bodyText.length);
+            console.log('Raw request body preview:', bodyText.substring(0, 100) + (bodyText.length > 100 ? '...' : ''));
+        } catch (error) {
+            console.error('Failed to read raw request body:', error);
+        }
 
         if (!bodyText || bodyText.trim().length === 0) {
             console.error('Empty request body received');
@@ -102,7 +107,6 @@ async function POSTHandler(request: NextRequest) {
             );
         }
 
-        // Fix type assignment for title and subtitle
         const titleEntry = formData.get('title');
         const subtitleEntry = formData.get('subtitle');
 
