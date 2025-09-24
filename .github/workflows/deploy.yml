@@ -31,7 +31,7 @@ jobs:
 
             # Stash any local changes
             git stash
-            git pull origin feature/new_latest_migration_mysql
+            git pull origin main
             mv .env.local .env.local.backup
 
             # Ensure production uploads directory exists and has proper permissions
