@@ -108,15 +108,23 @@ async function POSTHandler(request: NextRequest) {
             const imageFileEntry = formData.get('imageFile');
             console.log('Image file entry type:', imageFileEntry?.constructor.name);
             
-            if (imageFileEntry && (imageFileEntry instanceof File || imageFileEntry instanceof Blob)) {
-                file = imageFileEntry as File;
+            if (imageFileEntry && typeof imageFileEntry === 'object' && 'arrayBuffer' in imageFileEntry) {
+                const buffer = await imageFileEntry.arrayBuffer();
+                const filename = 'name' in imageFileEntry ? (imageFileEntry as any).name : 'upload.jpg';
+                
+                file = {
+                    name: filename,
+                    type: 'type' in imageFileEntry ? (imageFileEntry as any).type : 'image/jpeg',
+                    arrayBuffer: async () => buffer
+                } as File;
+                
                 console.log('File details:', {
                     name: file.name,
-                    size: file.size,
-                    type: file.type
+                    type: file.type,
+                    size: buffer.byteLength
                 });
             } else {
-                console.log('imageFile is not a File/Blob:', imageFileEntry);
+                console.log('imageFile is not a valid file entry:', imageFileEntry);
             }
             
             title = formData.get('title') as string || '';
@@ -174,7 +182,7 @@ async function POSTHandler(request: NextRequest) {
             subtitle
         });
 
-        if (!file || !(file instanceof File)) {
+        if (!file || !('arrayBuffer' in file)) {
             console.error('No valid file provided in the request.');
             return NextResponse.json(
                 { message: 'No valid file provided' },

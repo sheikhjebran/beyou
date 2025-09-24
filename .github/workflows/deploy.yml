@@ -49,6 +49,7 @@ jobs:
             chown -R www-data:www-data /var/www/beyou/uploads
             chmod -R 755 /var/www/beyou/uploads
 
+            npm install
             npm ci
             npm run migrate:server
             npm run build
