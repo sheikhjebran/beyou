@@ -1,5 +1,4 @@
-import { NextResponse } from 'next/server';
-import { type NextRequest } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { verifyAdminAuth } from '@/lib/server/admin-auth';
 
 // For API routes
@@ -26,18 +25,29 @@ export async function withAdminAuth(request: NextRequest, handler: (request: Nex
       console.log('Admin verified:', admin.email);
 
       // Add admin data to the request headers for use in the handler
-      const requestWithAdmin = new Request(request.url, {
+      // Clone the request to preserve the body and add headers
+      const newHeaders = new Headers(request.headers);
+      newHeaders.set('x-admin-id', admin.id);
+      newHeaders.set('x-admin-email', admin.email);
+      newHeaders.set('x-admin-role', admin.role);
+
+      // Create a new Request with preserved body
+      const requestInit: RequestInit = {
         method: request.method,
-        headers: new Headers({
-          ...Object.fromEntries(request.headers),
-          'x-admin-id': admin.id,
-          'x-admin-email': admin.email,
-          'x-admin-role': admin.role,
-        }),
-      });
+        headers: newHeaders,
+      };
+
+      // Only add body for methods that support it
+      if (['POST', 'PUT', 'PATCH'].includes(request.method)) {
+        requestInit.body = request.body;
+      }
+
+      const requestWithAdmin = new NextRequest(
+        new Request(request.url, requestInit)
+      );
 
       // Continue to the handler if authenticated
-      return await handler(requestWithAdmin as NextRequest);
+      return await handler(requestWithAdmin);
     } catch (verifyError) {
       console.error('Token verification failed:', verifyError);
       return NextResponse.json({ error: 'Unauthorized - Invalid token' }, { status: 401 });
