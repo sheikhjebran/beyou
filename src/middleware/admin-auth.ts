@@ -32,7 +32,7 @@ export async function withAdminAuth(request: NextRequest, handler: (request: Nex
       newHeaders.set('x-admin-role', admin.role);
 
       // Create a new Request with preserved body
-      const requestInit: RequestInit = {
+      const requestInit: RequestInit & { duplex?: string } = {
         method: request.method,
         headers: newHeaders,
       };
@@ -40,6 +40,7 @@ export async function withAdminAuth(request: NextRequest, handler: (request: Nex
       // Only add body for methods that support it
       if (['POST', 'PUT', 'PATCH'].includes(request.method)) {
         requestInit.body = request.body;
+        requestInit.duplex = 'half'; // Required when body is provided
       }
 
       const requestWithAdmin = new NextRequest(
