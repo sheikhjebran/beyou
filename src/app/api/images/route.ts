@@ -1,6 +1,10 @@
 import { NextRequest } from 'next/server';
 import { saveUploadedFile, deleteUploadedFile, ensureUploadDirs } from '@/lib/server/imageOperations';
 
+// Configure route segment to allow large file uploads
+export const maxDuration = 60; // 60 seconds timeout
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
     try {
         const formData = await request.formData();

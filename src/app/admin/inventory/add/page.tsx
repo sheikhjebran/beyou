@@ -24,7 +24,7 @@ import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
 
 const MAX_FILES = 5;
-const MAX_FILE_SIZE_MB = 5;
+const MAX_FILE_SIZE_MB = 100; // Increased to 100MB per file
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 

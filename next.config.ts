@@ -11,7 +11,16 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   experimental: {
-    typedRoutes: false
+    typedRoutes: false,
+    serverActions: {
+      bodySizeLimit: '1gb'
+    }
+  },
+  // Configure API route body size limit
+  api: {
+    bodyParser: {
+      sizeLimit: '1gb',
+    },
   },
   images: {
     domains: ['localhost', 'beyoushop.in', 'placehold.co'],

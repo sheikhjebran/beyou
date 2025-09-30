@@ -1,5 +1,0 @@
-]<changes>
-  <change>
-    <file>path/to/file.txt</file>
-    <description>Example change</description>
-    <content><![CDATA[
