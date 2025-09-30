@@ -51,10 +51,10 @@ jobs:
             chmod -R 755 /var/www/beyou/uploads
 
             # Fix package-lock.json sync issues by regenerating if needed
-            if ! npm ci --omit=dev 2>/dev/null; then
+            if ! npm ci 2>/dev/null; then
               echo "npm ci failed, regenerating package-lock.json..."
               rm -f package-lock.json
-              npm install --omit=dev
+              npm install
             fi
             npm run migrate:server
             npm run build
