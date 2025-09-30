@@ -34,13 +34,15 @@ export async function GET(request: NextRequest) {
         const minPrice = searchParams.get('minPrice') ? parseFloat(searchParams.get('minPrice')!) : undefined;
         const maxPrice = searchParams.get('maxPrice') ? parseFloat(searchParams.get('maxPrice')!) : undefined;
         const isBestSeller = searchParams.get('isBestSeller') ? searchParams.get('isBestSeller') === 'true' : undefined;
+        const search = searchParams.get('search') || undefined;
 
         const result = await productService.getProducts(page, pageSize, {
             category,
             subCategory,
             minPrice,
             maxPrice,
-            isBestSeller
+            isBestSeller,
+            search
         });
         
         return NextResponse.json(result);

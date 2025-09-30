@@ -138,6 +138,7 @@ export async function getProducts(page: number = 1, pageSize: number = 10, filte
     minPrice?: number;
     maxPrice?: number;
     isBestSeller?: boolean;
+    search?: string;
 }): Promise<PaginatedProducts> {
     const connection = await pool.getConnection();
     try {
@@ -168,6 +169,11 @@ export async function getProducts(page: number = 1, pageSize: number = 10, filte
             if (filters.isBestSeller !== undefined) {
                 whereConditions.push('p.is_best_seller = ?');
                 whereParams.push(filters.isBestSeller);
+            }
+            if (filters.search) {
+                whereConditions.push('(p.name LIKE ? OR p.description LIKE ? OR p.category LIKE ? OR p.subcategory LIKE ?)');
+                const searchPattern = `%${filters.search}%`;
+                whereParams.push(searchPattern, searchPattern, searchPattern, searchPattern);
             }
         }
 
