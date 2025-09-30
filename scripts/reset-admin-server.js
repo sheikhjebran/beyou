@@ -62,8 +62,8 @@ async function resetAdminUser() {
     console.log("✅ Connected to database");
 
     // Admin credentials
-    const adminEmail = "admin@beyou.com";
-    const adminPassword = "Admin@123";
+    const adminEmail = "ayesha@beyou.com";
+    const adminPassword = "x#_95ee%fJyD";
 
     // Hash the password
     console.log("🔒 Hashing password...");
