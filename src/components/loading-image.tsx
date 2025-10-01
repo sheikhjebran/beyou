@@ -42,6 +42,12 @@ export function LoadingImage(props: Props) {
 
   // Format local image paths
   const getImageUrl = (src: string) => {
+    // Handle null, undefined, or string representations of null/undefined
+    if (!src || src === 'null' || src === 'undefined' || src.trim() === '') {
+      console.log('LoadingImage: Using placeholder for invalid src:', src);
+      return '/images/placeholder.png';
+    }
+    
     if (src.startsWith('http://') || src.startsWith('https://')) {
       return src;
     }
@@ -51,7 +57,9 @@ export function LoadingImage(props: Props) {
     }
     // Convert /uploads paths to use API route
     if (src.startsWith('/uploads')) {
-      return `/api${src}`;
+      const apiUrl = `/api${src}`;
+      console.log('LoadingImage: Converting uploads path:', src, '->', apiUrl);
+      return apiUrl;
     }
     // For local images, ensure they start with a forward slash
     return src.startsWith('/') ? src : `/${src}`;
@@ -95,7 +103,7 @@ export function LoadingImage(props: Props) {
         />
       ) : (
         <Image
-          src={props.src && props.src !== '' ? getImageUrl(props.src) : '/images/placeholder.png'}
+          src={getImageUrl(props.src)}
           alt={props.alt}
           width={props.width}
           height={props.height}

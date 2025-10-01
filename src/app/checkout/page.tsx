@@ -7,12 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Trash2, Minus, Plus, ShoppingBag, StickyNote, ExternalLink } from 'lucide-react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { Header } from '@/components/header';
 import { Footer } from '@/components/footer';
 import { Separator } from '@/components/ui/separator';
 import { AddressFormDialog, type AddressFormValues } from '@/components/address-form-dialog';
+import { LoadingImage } from '@/components/loading-image';
 
 const WHATSAPP_NUMBER = "918088374457";
 
@@ -103,8 +103,8 @@ export default function CheckoutPage() {
                         <TableRow key={`${item.product.id}-${item.note || index}`}>
                           <TableCell className="pl-2 md:pl-4">
                             <div className="relative w-12 h-12 md:w-16 md:h-16">
-                              <Image
-                                src={item.product.primary_image_path || 'https://placehold.co/64x64.png'}
+                              <LoadingImage
+                                src={item.product.primary_image_path || '/images/placeholder.png'}
                                 alt={item.product.name}
                                 fill // Use fill for responsive fixed size containers
                                 sizes="64px" // Provide an accurate size
